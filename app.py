@@ -383,7 +383,8 @@ def render(topic="", grade="", teacher=None, student=None, modes=("teacher_stude
         "@@BP_OPTIONS@@": "".join(f'<option value="{html.escape(r["topic"])}">' for r in bps),
         "@@BLUEPRINTS@@": render_blueprints(bps), "@@BP_COUNT@@": str(len(bps)),
         "@@RATE@@": f"{USD_INR:.2f}", "@@RESULTS@@": results, "@@LIBRARY@@": lib_html, "@@LIB_COUNT@@": str(lib_count),
-        "@@ACCESS_FIELD@@": ACCESS_FIELD.replace("@@ACCESS_VAL@@", html.escape(request.cookies.get("access_code", ""))),
+        "@@ACCESS_FIELD@@": ACCESS_FIELD.replace(
+            "@@ACCESS_VAL@@", html.escape(request.form.get("access_code") or request.cookies.get("access_code", ""))),
     }.items():
         out = out.replace(key, val)
     return out
