@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Formation by a Convex Lens</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, sans-serif;
+      background: #f3f7fb;
+      color: #183047;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1120px; margin: auto; padding: 22px; }
+    h1 { margin: 0 0 5px; font-size: clamp(1.5rem, 3vw, 2.2rem); }
+    h2 { font-size: 1.15rem; margin: 0 0 14px; }
+    p { line-height: 1.5; }
+    .subtitle { margin: 0 0 18px; color: #536879; }
+    .card {
+      background: white;
+      border: 1px solid #dce6ef;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 3px 12px #1830470b;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #dce6ef;
+      border-radius: 10px;
+      background: #fbfdff;
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; font-size: .9rem; }
+    .key { display: inline-block; width: 23px; height: 3px; vertical-align: middle; margin-right: 5px; }
+    .note { color: #536879; font-size: .9rem; margin: 10px 0 0; }
+    .layout { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr); gap: 16px; }
+    .control { margin: 0 0 19px; }
+    .control label { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+    input[type="range"] { width: 100%; margin: 12px 0 0; accent-color: #1469a6; }
+    button {
+      border: 0; border-radius: 9px; background: #1769a6;
+      color: white; padding: 10px 15px; font: inherit; cursor: pointer;
+    }
+    button:hover { background: #105584; }
+    button:focus-visible, summary:focus-visible, input:focus-visible { outline: 3px solid #e8a337; outline-offset: 3px; }
+    .readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    .readout { background: #f2f7fb; border-radius: 9px; padding: 10px; }
+    .readout small { display: block; color: #536879; margin-bottom: 4px; }
+    .readout strong { font-size: 1.05rem; }
+    .wide { grid-column: 1 / -1; }
+    .equation { margin: 15px 0 0; padding: 10px; border-left: 3px solid #1769a6; background: #f2f7fb; }
+    .observations { padding-left: 21px; line-height: 1.55; }
+    .observations li { margin: 7px 0; padding: 3px 5px; }
+    .observations li.active { background: #e4f3e9; border-radius: 5px; font-weight: 600; }
+    .question { border-top: 1px solid #dce6ef; padding: 15px 0; }
+    .question:first-of-type { border-top: 0; padding-top: 0; }
+    .question p { margin: 0 0 8px; font-weight: 600; }
+    .options { margin: 0 0 10px; padding-left: 23px; line-height: 1.55; }
+    details summary { color: #1769a6; cursor: pointer; font-weight: 600; }
+    details .answer { margin: 8px 0 0; }
+    @media (max-width: 700px) { .layout { grid-template-columns: 1fr; } main { padding: 12px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Image Formation by a Convex Lens</h1>
+  <p class="subtitle">Class 10 Physics · Move the object or change the lens to explore the three standard rays.</p>
+
+  <section class="card" aria-label="Convex lens ray diagram">
+    <canvas id="diagram" width="900" height="450" role="img" aria-label="Ray diagram of an object and its image formed by a convex lens"></canvas>
+    <div class="legend" aria-label="Diagram key">
+      <span><i class="key" style="background:#e18a25"></i>Parallel ray → F₂</span>
+      <span><i class="key" style="background:#16818d"></i>Ray through optical centre</span>
+      <span><i class="key" style="background:#8055b3"></i>Ray through F₁ → parallel</span>
+      <span><i class="key" style="background:#be4f62"></i>Image</span>
+    </div>
+    <p class="note">Dashed lines are backward extensions or a virtual image. Rays and images outside the drawing area are clipped; the readouts still show their calculated values.</p>
+  </section>
+
+  <div class="layout">
+    <section class="card" aria-labelledby="controls-heading">
+      <h2 id="controls-heading">Controls</h2>
+      <div class="control">
+        <label for="u">Object distance u <output id="uValue">−30.0 cm</output></label>
+        <input id="u" type="range" min="-60" max="-3" step="0.1" value="-30">
+      </div>
+      <div class="control">
+        <label for="f">Focal length f <output id="fValue">10.0 cm</output></label>
+        <input id="f" type="range" min="5" max="25" step="0.1" value="10">
+      </div>
+      <div class="control">
+        <label for="h">Object height h <output id="hValue">2.0 cm</output></label>
+        <input id="h" type="range" min="1" max="5" step="0.1" value="2">
+      </div>
+      <button id="reset" type="button">Reset to defaults</button>
+      <p class="note">New Cartesian sign convention: distances to the left of the optical centre O are negative, so u is negative.</p>
+    </section>
+
+    <section class="card" aria-labelledby="readouts-heading">
+      <h2 id="readouts-heading">Live results</h2>
+      <div class="readouts" aria-live="polite">
+        <div class="readout"><small>Image distance v</small><strong id="vRead"></strong></div>
+        <div class="readout"><small>Magnification m</small><strong id="mRead"></strong></div>
+        <div class="readout"><small>Image height h′</small><strong id="heightRead"></strong></div>
+        <div class="readout"><small>Power P</small><strong id="powerRead"></strong></div>
+        <div class="readout wide"><small>Nature of image</small><strong id="natureRead"></strong></div>
+      </div>
+      <p class="equation"><strong>Lens formula:</strong> 1/v − 1/u = 1/f<br>
+        <strong>Also:</strong> m = h′/h = v/u; &nbsp; P = 1/f (f in metres), in dioptres (D).
+      </p>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="observe-heading">
+    <h2 id="observe-heading">What to observe</h2>
+    <ul class="observations" id="observations">
+      <li>Object beyond 2F₁: image lies between F₂ and 2F₂; real, inverted and diminished.</li>
+      <li>Object at 2F₁: image forms at 2F₂; real, inverted and the same size.</li>
+      <li>Object between F₁ and 2F₁: image lies beyond 2F₂; real, inverted and magnified.</li>
+      <li>Object at F₁: refracted rays are parallel; the image forms at infinity.</li>
+      <li>Object between F₁ and O: image forms on the object's side; virtual, erect and magnified.</li>
+      <li>A shorter focal length gives a larger power in dioptres.</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="questions-heading">
+    <h2 id="questions-heading">Check your understanding</h2>
+    <div class="question">
+      <p>1. An object is at 2F₁ of a convex lens. Where does the image form?</p>
+      <ol class="options" type="A"><li>At F₂</li><li>At 2F₂</li><li>Beyond 2F₂</li><li>At infinity</li></ol>
+      <details><summary>Reveal answer</summary><p class="answer"><strong>At 2F₂.</strong> With u = −2f, 1/v = 1/f − 1/(2f) = 1/(2f), so v = 2f and m = −1.</p></details>
+    </div>
+    <div class="question">
+      <p>2. A convex lens is used as a magnifying glass. Where is the object placed?</p>
+      <ol class="options" type="A"><li>Beyond 2F₁</li><li>At F₁</li><li>Between F₁ and O</li><li>At 2F₁</li></ol>
+      <details><summary>Reveal answer</summary><p class="answer"><strong>Between F₁ and O.</strong> Then v is negative, so the image is virtual, erect and magnified.</p></details>
+    </div>
+    <div class="question">
+      <p>3. What is the power of a convex lens of focal length 10 cm?</p>
+      <ol class="options" type="A"><li>+0.1 D</li><li>+10 D</li><li>−10 D</li><li>+1 D</li></ol>
+      <details><summary>Reveal answer</summary><p class="answer"><strong>+10 D.</strong> P = 1/f = 1/(0.10 m) = +10 D; it is positive for a convex lens.</p></details>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById('diagram');
+  const ctx = canvas.getContext('2d');
+  const inputs = ['u', 'f', 'h'].map(id => document.getElementById(id));
+  const X = 450, Y = 225, S = 6, W = 900;
+  const colours = { parallel: '#e18a25', centre: '#16818d', focus: '#8055b3', image: '#be4f62' };
+  const format = n => (n < 0 ? '−' : '') + Math.abs(n).toFixed(1);
+
+  function line(x1, y1, x2, y2, colour, width = 2, dashed = false) {
+    if (![x1, y1, x2, y2].every(Number.isFinite)) return;
+    ctx.beginPath();
+    ctx.setLineDash(dashed ? [7, 6] : []);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function text(label, x, y, colour = '#435b70', align = 'center') {
+    ctx.fillStyle = colour;
+    ctx.textAlign = align;
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.fillText(label, x, y);
+  }
+
+  function arrow(x, top, colour, dashed = false, label = '') {
+    if (!Number.isFinite(x) || !Number.isFinite(top)) return;
+    line(x, Y, x, top, colour, 3, dashed);
+    const dir = top < Y ? 1 : -1;
+    line(x, top, x - 6, top + dir * 11, colour, 3, dashed);
+    line(x, top, x + 6, top + dir * 11, colour, 3, dashed);
+    if (label) text(label, x + 10, top + (top < Y ? -8 : 19), colour, 'left');
+  }
+
+  function update() {
+    const u = +inputs[0].value, f = +inputs[1].value, h = +inputs[2].value;
+    const infinity = Math.abs(u + f) < 0.2;
+    const v = infinity ? null : u * f / (u + f);
+    const m = infinity ? null : v / u;
+    const hp = infinity ? null : m * h;
+    const objectX = X + S * u, objectTop = Y - S * h;
+
+    document.getElementById('uValue').textContent = format(u) + ' cm';
+    document.getElementById('fValue').textContent = format(f) + ' cm';
+    document.getElementById('hValue').textContent = format(h) + ' cm';
+    document.getElementById('vRead').textContent = infinity ? 'at infinity' : format(v) + ' cm';
+    document.getElementById('mRead').textContent = infinity ? 'not finite' : format(m);
+    document.getElementById('heightRead').textContent = infinity ? 'not finite' : format(hp) + ' cm';
+    document.getElementById('powerRead').textContent = '+' + format(100 / f) + ' D';
+    document.getElementById('natureRead').textContent = infinity
+      ? 'Image at infinity; refracted rays parallel'
+      : (v > 0 ? 'Real, inverted, ' : 'Virtual, erect, ') +
+        (Math.abs(Math.abs(m) - 1) < 0.005 ? 'same size' : Math.abs(m) > 1 ? 'magnified' : 'diminished');
+
+    const active = infinity ? 3 : u > -f ? 4 : Math.abs(u + 2 * f) < 0.06 ? 1 : u < -2 * f ? 0 : 2;
+    document.querySelectorAll('#observations li').forEach((li, i) => li.classList.toggle('active', i === active));
+
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(900 * dpr) || canvas.height !== Math.round(450 * dpr)) {
+      canvas.width = Math.round(900 * dpr);
+      canvas.height = Math.round(450 * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, 900, 450);
+
+    // Principal axis and the four labelled focal marks.
+    line(20, Y, 880, Y, '#8fa3b4', 1.5);
+    [[-2*f, '2F₁'], [-f, 'F₁'], [f, 'F₂'], [2*f, '2F₂']].forEach(([cm, label]) => {
+      const px = X + S * cm;
+      line(px, Y - 6, px, Y + 6, '#627d93', 1.5);
+      text(label, px, Y + 25);
+    });
+
+    // A thin convex lens, with its optical centre on the axis.
+    ctx.beginPath();
+    ctx.moveTo(X, 70);
+    ctx.bezierCurveTo(X - 19, 145, X - 19, 305, X, 380);
+    ctx.bezierCurveTo(X + 19, 305, X + 19, 145, X, 70);
+    ctx.closePath();
+    ctx.fillStyle = '#dceefa';
+    ctx.fill();
+    ctx.strokeStyle = '#3977a4';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(X, Y, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = '#24445e';
+    ctx.fill();
+    text('O', X + 13, Y - 9, '#24445e', 'left');
+    text('convex lens', X, 55, '#3977a4');
+
+    // Ray 1: parallel to the axis, then through F₂.
+    line(objectX, objectTop, X, objectTop, colours.parallel);
+    const ray1AtRight = objectTop + (W - X) * h / f;
+    line(X, objectTop, W, ray1AtRight, colours.parallel);
+
+    // Ray 2: straight through the optical centre.
+    line(objectX, objectTop, X, Y, colours.centre);
+    line(X, Y, W, Y + (W - X) * (-h / u), colours.centre);
+
+    // Ray 3: through F₁ (or aimed so its backward extension passes through F₁),
+    // then parallel to the principal axis. It is undefined when u = −f.
+    if (Math.abs(u + f) >= 0.2) {
+      const ray3AtLens = Y - S * h * f / (u + f);
+      line(objectX, objectTop, X, ray3AtLens, colours.focus);
+      line(X, ray3AtLens, W, ray3AtLens, colours.focus);
+    }
+
+    if (v !== null && v < 0) {
+      const imageX = X + S * v;
+      const imageTop = Y - S * hp;
+      // Only backward extensions are dashed, not the light approaching the lens.
+      line(X, objectTop, imageX, imageTop, colours.parallel, 1.7, true);
+      line(objectX, objectTop, imageX, imageTop, colours.centre, 1.7, true);
+      line(X, imageTop, imageX, imageTop, colours.focus, 1.7, true);
+    }
+
+    arrow(objectX, objectTop, '#24445e', false, 'object');
+    if (v !== null) {
+      const imageX = X + S * v, imageTop = Y - S * hp;
+      if (imageX >= 12 && imageX <= 888 && imageTop >= 12 && imageTop <= 438) {
+        arrow(imageX, imageTop, colours.image, v < 0, 'image');
+      } else {
+        text('Image lies outside the drawing area', 450, 425, colours.image);
+      }
+    } else {
+      text('Refracted rays are parallel → image at infinity', 660, 407, colours.image);
+    }
+  }
+
+  inputs.forEach(input => input.addEventListener('input', update));
+  document.getElementById('reset').addEventListener('click', () => {
+    inputs[0].value = -30;
+    inputs[1].value = 10;
+    inputs[2].value = 2;
+    update();
+  });
+  update();
+})();
+</script>
+</body>
+</html>

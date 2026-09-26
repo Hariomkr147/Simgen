@@ -1,0 +1,131 @@
+{
+  "topic": "Working of Human Heart",
+  "grade": 10,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-24 15:55",
+  "cost_usd": 0.04878,
+  "in_tokens": 665,
+  "out_tokens": 2306,
+  "seconds": 27.18,
+  "plan": {
+    "title": "Working of the Human Heart: Double Circulation and the Cardiac Cycle",
+    "grade": 10,
+    "subject": "Biology",
+    "ncert_refs": [
+      "NCERT Class 10 Science, Ch 5 Life Processes, 5.4.1 Transportation in Human Beings",
+      "Fig 5.10 Schematic of transport and exchange of oxygen and carbon dioxide",
+      "Fig 5.11 Blood pressure (Sphygmomanometer, 120/80 mm Hg)"
+    ],
+    "learning_objectives": [
+      "Trace blood through the four heart chambers, lungs and body.",
+      "Explain how valves keep blood flowing one way.",
+      "Explain why separating oxygenated and deoxygenated blood matters.",
+      "Calculate cardiac output from heart rate and stroke volume.",
+      "Relate systolic and diastolic pressure to heart phases."
+    ],
+    "physics": {
+      "equations": [
+        "Beat period T = 60 / HR (s)",
+        "Cardiac output CO = HR × SV (mL/min)",
+        "Phase φ = (t mod T) / T",
+        "Atrial contraction: 0 ≤ φ < 0.125",
+        "Ventricular contraction: 0.125 ≤ φ < 0.5",
+        "Relaxation: 0.5 ≤ φ < 1",
+        "Aortic pressure P = 80 + 40·sin(π(φ−0.125)/0.375) mm Hg during ventricular contraction, else P = 80 mm Hg"
+      ],
+      "parameters": [
+        {
+          "name": "Heart rate",
+          "symbol": "HR",
+          "unit": "beats/min",
+          "min": 50,
+          "max": 150,
+          "default": 72
+        },
+        {
+          "name": "Stroke volume",
+          "symbol": "SV",
+          "unit": "mL/beat",
+          "min": 50,
+          "max": 100,
+          "default": 70
+        },
+        {
+          "name": "Animation speed",
+          "symbol": "k",
+          "unit": "× real time",
+          "min": 0.25,
+          "max": 1,
+          "default": 0.5
+        }
+      ],
+      "state_update": "Each frame: t += dt·k; T = 60/HR; φ = (t mod T)/T; set chamber scale, valve states and P(φ); move particles along the path at speed ∝ CO; set particle colour red after the lungs and blue after the body."
+    },
+    "visualization": "Front-view SVG heart with four chambers. The right side is shaded blue and the left side red. Lungs sit above the heart and the body loop below. Tricuspid, bicuspid and semilunar valves appear as flaps. Blood dots flow through the vena cava, right atrium, right ventricle, pulmonary artery, lungs, pulmonary vein, left atrium, left ventricle, aorta and body. A scrolling P-vs-time graph and a phase label run alongside.",
+    "controls": [
+      "Heart rate slider (beats/min)",
+      "Stroke volume slider (mL/beat)",
+      "Animation speed slider (× real time)",
+      "Pause/Play button"
+    ],
+    "readouts": [
+      "Beat period T (s)",
+      "Cardiac output (L/min)",
+      "Current phase name",
+      "Aortic pressure P (mm Hg)",
+      "Systolic/Diastolic (mm Hg)",
+      "Valve states (open/closed)"
+    ],
+    "observations": [
+      "Atria contract before the ventricles in every beat.",
+      "Tricuspid and bicuspid valves close when the ventricles contract.",
+      "Blood turns red in the lungs and blue in the body tissues.",
+      "Blood passes through the heart twice per full circuit.",
+      "Raising the heart rate shortens T and raises cardiac output."
+    ],
+    "questions": [
+      {
+        "q": "Which chamber pumps oxygenated blood to the body?",
+        "options": [
+          "Right atrium",
+          "Right ventricle",
+          "Left atrium",
+          "Left ventricle"
+        ],
+        "answer": "Left ventricle",
+        "explanation": "The thick-walled left ventricle pumps blood into the aorta."
+      },
+      {
+        "q": "HR = 75 beats/min and SV = 70 mL. What is the cardiac output?",
+        "options": [
+          "5.25 L/min",
+          "1.07 L/min",
+          "145 mL/min",
+          "52.5 L/min"
+        ],
+        "answer": "5.25 L/min",
+        "explanation": "75 × 70 = 5250 mL/min, which is 5.25 L/min."
+      },
+      {
+        "q": "What prevents backflow from the ventricles into the atria?",
+        "options": [
+          "Arteries",
+          "Valves",
+          "Capillaries",
+          "Lungs"
+        ],
+        "answer": "Valves",
+        "explanation": "Valves close when the ventricles contract, keeping flow one-way."
+      }
+    ],
+    "misconceptions": [
+      "All arteries carry oxygenated blood: the pulmonary artery carries deoxygenated blood.",
+      "The heart is on the left: it sits centrally, tilted slightly left.",
+      "Both sides of the heart mix blood: the septum keeps them separate.",
+      "120 mm Hg is the average pressure: it is the peak during ventricular contraction."
+    ],
+    "grade_language_notes": "Use 'contraction' and 'relaxation' and introduce 'systole/diastole' once. Use only arithmetic, with no calculus. Mention the sphygmomanometer and 120/80 mm Hg as in NCERT."
+  }
+}

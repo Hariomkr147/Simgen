@@ -1,0 +1,126 @@
+{
+  "topic": "Class 10 Science: Reflection of light by a concave mirror",
+  "grade": 10,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-23 10:41",
+  "cost_usd": 0.037132,
+  "in_tokens": 678,
+  "out_tokens": 1721,
+  "seconds": 21.34,
+  "plan": {
+    "title": "Concave Mirror Image Formation Lab",
+    "grade": 10,
+    "subject": "Physics",
+    "ncert_refs": [
+      "NCERT Class 10 Science, Ch 9 Light – Reflection and Refraction: 9.2 Spherical Mirrors",
+      "9.2.2 Image formation by concave mirror (Table 9.1)",
+      "9.2.3 Sign convention and mirror formula, magnification"
+    ],
+    "learning_objectives": [
+      "Locate the image for any object position using ray diagrams",
+      "Apply 1/v + 1/u = 1/f with the New Cartesian sign convention",
+      "Classify the image as real/virtual, inverted/erect, and enlarged/diminished from m"
+    ],
+    "physics": {
+      "equations": [
+        "1/v + 1/u = 1/f",
+        "R = 2f",
+        "m = h'/h = -v/u"
+      ],
+      "parameters": [
+        {
+          "name": "Object distance (magnitude)",
+          "symbol": "|u|",
+          "unit": "cm",
+          "min": 2,
+          "max": 60,
+          "default": 30
+        },
+        {
+          "name": "Focal length (magnitude)",
+          "symbol": "|f|",
+          "unit": "cm",
+          "min": 5,
+          "max": 20,
+          "default": 10
+        },
+        {
+          "name": "Object height",
+          "symbol": "h",
+          "unit": "cm",
+          "min": 1,
+          "max": 5,
+          "default": 3
+        }
+      ],
+      "state_update": "On input: u=-|u|, f=-|f|; if |u-f|<0.05 then image at infinity; else v=u*f/(u-f), m=-v/u, h'=m*h; redraw."
+    },
+    "visualization": "Canvas: principal axis, pole P at right, concave arc facing left, points F and C marked, object arrow at u; draw 3 rays (parallel→through F, through F→parallel, through C→back on itself); real image uses solid rays, virtual image uses dashed back-extensions behind mirror; image arrow at v with height h'. Scale 1 cm = 8 px.",
+    "controls": [
+      "Slider: object distance |u| (cm), 2–60, step 0.5",
+      "Slider: focal length |f| (cm), 5–20, step 0.5",
+      "Slider: object height h (cm), 1–5, step 0.5",
+      "Button: Reset to defaults"
+    ],
+    "readouts": [
+      "u (cm)",
+      "f (cm) and R (cm)",
+      "v (cm)",
+      "m (no unit)",
+      "h' (cm)",
+      "Nature: Real/Virtual, Inverted/Erect, Enlarged/Same size/Diminished",
+      "Equation text: 1/v + 1/u = 1/f, m = -v/u"
+    ],
+    "observations": [
+      "Object beyond C: image between F and C, real, inverted, diminished",
+      "Object at C: image at C, real, inverted, same size (m = -1)",
+      "Object between C and F: image beyond C, real, inverted, enlarged",
+      "Object at F: reflected rays parallel, image at infinity",
+      "Object between F and P: image behind mirror, virtual, erect, enlarged (m > 1)"
+    ],
+    "questions": [
+      {
+        "q": "An object is 30 cm in front of a concave mirror of focal length 10 cm. Where is the image?",
+        "options": [
+          "-15 cm",
+          "-20 cm",
+          "+15 cm",
+          "-30 cm"
+        ],
+        "answer": "-15 cm",
+        "explanation": "1/v = 1/f - 1/u = -1/10 + 1/30 = -1/15, so v = -15 cm."
+      },
+      {
+        "q": "If m = -1 for a concave mirror, where is the object?",
+        "options": [
+          "At F",
+          "At C",
+          "Between F and P",
+          "At infinity"
+        ],
+        "answer": "At C",
+        "explanation": "m = -1 means a same-size inverted real image, which forms only when the object is at C."
+      },
+      {
+        "q": "Which object position gives an erect image in a concave mirror?",
+        "options": [
+          "Beyond C",
+          "At C",
+          "Between F and P",
+          "Between C and F"
+        ],
+        "answer": "Between F and P",
+        "explanation": "Only then v is positive, so the image is virtual and erect, as in a shaving mirror."
+      }
+    ],
+    "misconceptions": [
+      "A concave mirror always forms an inverted image",
+      "A virtual image can be caught on a screen",
+      "Distances are always positive; students ignore the sign convention",
+      "Moving the object closer always makes the image smaller"
+    ],
+    "grade_language_notes": "Use only algebra and fractions; keep terms pole, centre of curvature, focus, principal axis; state that all distances are measured from the pole P; no calculus."
+  }
+}

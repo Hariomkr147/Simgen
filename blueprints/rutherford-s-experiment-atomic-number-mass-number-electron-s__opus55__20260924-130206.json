@@ -1,0 +1,137 @@
+{
+  "topic": "Rutherford's experiment, atomic number, mass number, electron shells, isotopes.",
+  "grade": 9,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-24 13:02",
+  "cost_usd": 0.051264,
+  "in_tokens": 686,
+  "out_tokens": 2426,
+  "seconds": 27.82,
+  "plan": {
+    "title": "Rutherford Scattering and Atom Builder",
+    "grade": 9,
+    "subject": "Science (Physics/Chemistry)",
+    "ncert_refs": [
+      "NCERT Class 9 Science, Ch 4 Structure of the Atom: 4.2.2 Rutherford's Model",
+      "4.2.4 Distribution of Electrons in Shells",
+      "4.4 Atomic Number and Mass Number",
+      "4.5 Isotopes"
+    ],
+    "learning_objectives": [
+      "Explain why most alpha particles pass straight while a few bounce back",
+      "Infer a tiny, dense, positive nucleus from scattering",
+      "Calculate A = Z + N and fill shells using 2, 8, 8",
+      "Identify isotopes as the same Z with a different N"
+    ],
+    "physics": {
+      "equations": [
+        "F = k(2e)(Ze)/r², where k·e² = 1.44 MeV·fm",
+        "d_min = 2Z(1.44)/E fm (head-on distance of closest approach)",
+        "tan(θ/2) = d_min/(2b)",
+        "A = Z + N; electrons = Z for a neutral atom",
+        "Shell capacity 2n²; for the first 18 elements fill K=2, L=8, M=8"
+      ],
+      "parameters": [
+        {
+          "name": "Alpha kinetic energy",
+          "symbol": "E",
+          "unit": "MeV",
+          "min": 2,
+          "max": 10,
+          "default": 5
+        },
+        {
+          "name": "Target nucleus charge",
+          "symbol": "Z_t",
+          "unit": "none",
+          "min": 1,
+          "max": 92,
+          "default": 79
+        },
+        {
+          "name": "Protons in built atom",
+          "symbol": "Z",
+          "unit": "none",
+          "min": 1,
+          "max": 18,
+          "default": 6
+        },
+        {
+          "name": "Neutrons in built atom",
+          "symbol": "N",
+          "unit": "none",
+          "min": 0,
+          "max": 22,
+          "default": 6
+        }
+      ],
+      "state_update": "Use units fm, fm/c, MeV. m=3727 MeV, v0=sqrt(2E/m)c. For each alpha: a = (2·Z_t·1.44/r²)/m along r̂ away from the nucleus. Integrate with velocity Verlet, dt=2 fm/c, 25 substeps per frame. Spawn at x=-400 fm with b uniform in [-300,300] fm, one alpha every 10 frames. Remove at |x| or |y| > 450 fm."
+    },
+    "visualization": "The left canvas shows the gold-foil view at 1 px = 1 fm with a red nucleus dot. Alpha paths are drawn as fading trails: green if θ<10°, orange if 10–90°, red if >90°. The right SVG is a Bohr diagram with protons and neutrons in the nucleus and electrons on K, L, M rings.",
+    "controls": [
+      "Slider: alpha energy E (MeV)",
+      "Slider: target nucleus charge Z_t (no unit)",
+      "Slider: protons Z (no unit)",
+      "Slider: neutrons N (no unit)"
+    ],
+    "readouts": [
+      "d_min (fm)",
+      "Counts and % deflected in the <10°, 10–90° and >90° bins",
+      "Element name and symbol (Z 1–18 lookup)",
+      "Mass number A = Z + N",
+      "Shell configuration, e.g. 2,4",
+      "Isotope note, e.g. C-12 vs C-14 when Z is the same"
+    ],
+    "observations": [
+      "Almost all alphas go straight through, so the atom is mostly empty space",
+      "About 1 in thousands bounce back, so the nucleus is tiny, heavy and positive",
+      "Higher E gives a smaller d_min and fewer large deflections",
+      "Changing N changes A but not the element or its shells",
+      "Z decides the element and the number of electrons"
+    ],
+    "questions": [
+      {
+        "q": "Why did most alpha particles pass through gold foil undeflected?",
+        "options": [
+          "Atom is mostly empty space",
+          "Gold is soft",
+          "Alphas are neutral",
+          "Electrons attract alphas"
+        ],
+        "answer": "Atom is mostly empty space",
+        "explanation": "The nucleus is tiny, so most alphas never come close to it."
+      },
+      {
+        "q": "An atom has 17 protons and 18 neutrons. What are its A and shell configuration?",
+        "options": [
+          "35; 2,8,7",
+          "18; 2,8,8",
+          "35; 2,8,8",
+          "17; 2,8,7"
+        ],
+        "answer": "35; 2,8,7",
+        "explanation": "A = 17 + 18 = 35, and 17 electrons fill as 2,8,7."
+      },
+      {
+        "q": "C-12 and C-14 differ in the number of:",
+        "options": [
+          "Neutrons",
+          "Protons",
+          "Electrons",
+          "Shells"
+        ],
+        "answer": "Neutrons",
+        "explanation": "Isotopes have the same Z but a different N."
+      }
+    ],
+    "misconceptions": [
+      "Electrons deflect the alphas (they are far too light to do so)",
+      "Mass number equals the number of electrons",
+      "Isotopes are different elements",
+      "The nucleus fills most of the atom"
+    ],
+    "grade_language_notes": "Use simple algebra only, and treat k·e² = 1.44 MeV·fm as a given constant. Call the fm a 'femtometre (10⁻¹⁵ m)'. Mention that deflection happens because like charges repel, and avoid any calculus."
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "topic": "Class 10 Science: Refraction of light through a convex lens",
+  "grade": 10,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-23 10:41",
+  "cost_usd": 0.047828,
+  "in_tokens": 677,
+  "out_tokens": 2256,
+  "seconds": 24.13,
+  "plan": {
+    "title": "Image Formation by a Convex Lens",
+    "grade": 10,
+    "subject": "Physics",
+    "ncert_refs": [
+      "NCERT Class 10 Science Ch 9: Light – Reflection and Refraction, Sec 9.3.4–9.3.8 (Image formation by lenses, Lens formula, Magnification, Power)"
+    ],
+    "learning_objectives": [
+      "Draw ray diagrams for a convex lens using three standard rays.",
+      "Apply the lens formula 1/v − 1/u = 1/f with the New Cartesian sign convention.",
+      "Predict image position, size and nature for object positions from beyond 2F1 to between F1 and O.",
+      "Compute power of a lens in dioptres."
+    ],
+    "physics": {
+      "equations": [
+        "1/v − 1/u = 1/f",
+        "v = u·f / (u + f)",
+        "m = h'/h = v/u",
+        "h' = m·h",
+        "P = 1/f (f in metres), unit dioptre D"
+      ],
+      "parameters": [
+        {
+          "name": "Object distance",
+          "symbol": "u",
+          "unit": "cm",
+          "min": -60,
+          "max": -3,
+          "default": -30
+        },
+        {
+          "name": "Focal length",
+          "symbol": "f",
+          "unit": "cm",
+          "min": 5,
+          "max": 25,
+          "default": 10
+        },
+        {
+          "name": "Object height",
+          "symbol": "h",
+          "unit": "cm",
+          "min": 1,
+          "max": 5,
+          "default": 2
+        }
+      ],
+      "state_update": "On any slider input, recompute v = u·f/(u+f); if |u+f| < 0.2 cm, set image at infinity; m = v/u; h' = m·h; P = 100/f; redraw rays and image."
+    },
+    "visualization": "Canvas 900×450 px, scale 6 px/cm, lens at centre on a horizontal principal axis. F1, F2, 2F1 and 2F2 are marked. The object is an upright arrow at u. Ray 1 runs parallel to the axis and then passes through F2. Ray 2 passes through the optical centre O without bending. Ray 3 passes through F1 and then leaves parallel to the axis. For v > 0, draw a solid inverted image arrow. For v < 0, draw dashed backward ray extensions and a dashed upright virtual image.",
+    "controls": [
+      "Slider: Object distance u (cm), −60 to −3",
+      "Slider: Focal length f (cm), 5 to 25",
+      "Slider: Object height h (cm), 1 to 5",
+      "Button: Reset to defaults"
+    ],
+    "readouts": [
+      "Image distance v (cm), or 'at infinity'",
+      "Magnification m",
+      "Image height h' (cm)",
+      "Nature of image: real/virtual, inverted/erect, magnified/diminished/same size",
+      "Power P (D)",
+      "Equation shown: 1/v − 1/u = 1/f"
+    ],
+    "observations": [
+      "Object beyond 2F1: image lies between F2 and 2F2, and is real, inverted and diminished.",
+      "Object at 2F1: image forms at 2F2, and is real, inverted and the same size.",
+      "Object between F1 and 2F1: image lies beyond 2F2, and is real, inverted and magnified.",
+      "Object at F1: the refracted rays are parallel, so the image forms at infinity.",
+      "Object between F1 and O: image forms on the same side as the object, and is virtual, erect and magnified.",
+      "A shorter focal length gives a larger power in dioptres."
+    ],
+    "questions": [
+      {
+        "q": "An object is at 2F1 of a convex lens. Where does the image form?",
+        "options": [
+          "At F2",
+          "At 2F2",
+          "Beyond 2F2",
+          "At infinity"
+        ],
+        "answer": "At 2F2",
+        "explanation": "With u = −2f, 1/v = 1/f − 1/(2f) = 1/(2f), so v = 2f and m = −1."
+      },
+      {
+        "q": "A convex lens is used as a magnifying glass. Where is the object placed?",
+        "options": [
+          "Beyond 2F1",
+          "At F1",
+          "Between F1 and O",
+          "At 2F1"
+        ],
+        "answer": "Between F1 and O",
+        "explanation": "Then v is negative, so the image is virtual, erect and magnified."
+      },
+      {
+        "q": "What is the power of a convex lens of focal length 10 cm?",
+        "options": [
+          "+0.1 D",
+          "+10 D",
+          "−10 D",
+          "+1 D"
+        ],
+        "answer": "+10 D",
+        "explanation": "P = 1/f = 1/(0.10 m) = +10 D; it is positive for a convex lens."
+      }
+    ],
+    "misconceptions": [
+      "A convex lens always forms real images; in fact it forms a virtual image when the object is inside F1.",
+      "The ray through the optical centre does not bend; it passes straight through.",
+      "In the New Cartesian convention u is negative; a positive u gives wrong results.",
+      "Power must be computed with f in metres, not centimetres."
+    ],
+    "grade_language_notes": "Use only algebra and fractions, with no calculus. Use NCERT terms: optical centre, principal focus, principal axis, New Cartesian sign convention and dioptre. Show values to one decimal place."
+  }
+}

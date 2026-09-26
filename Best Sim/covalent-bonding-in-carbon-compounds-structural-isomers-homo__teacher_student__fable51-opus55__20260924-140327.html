@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carbon Chains: Covalent Bonds, Isomers and the Homologous Series</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --panel:#ffffff; --ink:#1f2633; --muted:#5b6474;
+    --accent:#c0392b; --ok:#1e8449; --line:#d8dde6; --btn:#e9edf4; --btnOn:#2c3e75;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+  header{background:#2c3e75;color:#fff;padding:12px 18px}
+  header h1{margin:0;font-size:1.25rem}
+  header p{margin:2px 0 0;font-size:.85rem;opacity:.85}
+  main{max-width:1180px;margin:0 auto;padding:14px;display:grid;grid-template-columns:minmax(0,820px) minmax(260px,1fr);gap:14px}
+  @media (max-width:1000px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .card h2{font-size:1rem;margin:0 0 8px;color:#2c3e75}
+  canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:8px;background:#fcfdff}
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;margin-top:12px}
+  @media (max-width:640px){.controls{grid-template-columns:1fr}}
+  .ctrl label{font-size:.88rem;font-weight:600;display:block;margin-bottom:4px}
+  .ctrl input[type=range]{width:100%}
+  .ctrl .val{font-weight:700;color:var(--accent)}
+  .btnrow{display:flex;gap:6px;flex-wrap:wrap}
+  button{font:inherit;font-size:.88rem;padding:6px 10px;border-radius:6px;border:1px solid #b9c2d3;background:var(--btn);cursor:pointer;color:var(--ink)}
+  button.on{background:var(--btnOn);color:#fff;border-color:var(--btnOn)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .note{font-size:.8rem;color:var(--muted);margin-top:3px;min-height:1em}
+  table.ro{width:100%;border-collapse:collapse;font-size:.9rem}
+  table.ro td{padding:5px 4px;border-bottom:1px solid #eef0f4;vertical-align:top}
+  table.ro td:first-child{color:var(--muted);width:46%}
+  table.ro td:last-child{font-weight:600}
+  .eq{font-family:Consolas,"Courier New",monospace;background:#f1f4fa;border-left:4px solid #2c3e75;padding:8px 10px;border-radius:4px;font-size:.88rem;white-space:pre-wrap}
+  ul{margin:4px 0;padding-left:20px}
+  li{margin:4px 0;font-size:.9rem}
+  .q{border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0;background:#fafbfd}
+  .q p{margin:0 0 6px;font-weight:600;font-size:.92rem}
+  .opts{display:flex;flex-wrap:wrap;gap:6px}
+  .opts button.right{background:#d4efdf;border-color:var(--ok);color:#145a32}
+  .opts button.wrong{background:#f6d5d1;border-color:var(--accent);color:#78281f}
+  .exp{display:none;margin-top:6px;font-size:.87rem;background:#eef7f1;border-radius:6px;padding:6px 8px}
+  .exp.show{display:block}
+  .full{grid-column:1/-1}
+  .ok{color:var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Carbon Chains: Covalent Bonds, Isomers and the Homologous Series</h1>
+  <p>Class 10 Science · Chapter 4 Carbon and its Compounds (4.1 Bonding in Carbon, 4.2 Versatile Nature of Carbon)</p>
+</header>
+
+<main>
+  <section class="card">
+    <canvas id="cv" width="800" height="420" aria-label="Structural formula of the carbon compound with molar mass bar chart and boiling point plot"></canvas>
+
+    <div class="controls">
+      <div class="ctrl">
+        <label for="nSl">Number of carbon atoms, n = <span class="val" id="nVal">4</span> atoms</label>
+        <input type="range" id="nSl" min="1" max="10" step="1" value="4">
+        <div class="note" id="nNote"></div>
+      </div>
+      <div class="ctrl">
+        <label>Series type, k (–)</label>
+        <div class="btnrow">
+          <button id="k0" class="on">Alkane (C–C), k = 0</button>
+          <button id="k1">Alkene (C=C), k = 1</button>
+          <button id="k2">Alkyne (C≡C), k = 2</button>
+        </div>
+      </div>
+      <div class="ctrl">
+        <label for="iSl">Isomer index, i = <span class="val" id="iVal">1</span> (–)</label>
+        <input type="range" id="iSl" min="1" max="3" step="1" value="1">
+        <div class="note" id="iNote">Enabled only for alkanes with n = 4 or 5</div>
+      </div>
+      <div class="ctrl">
+        <label>Display mode, d (–)</label>
+        <div class="btnrow">
+          <button id="dBtn">Show electron dot structure</button>
+        </div>
+        <div class="note" id="dNote">d = 0: line structure (each line = one shared pair)</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Live readouts</h2>
+    <table class="ro">
+      <tr><td>Molecular formula</td><td id="roF"></td></tr>
+      <tr><td>Name</td><td id="roName"></td></tr>
+      <tr><td>Molar mass M</td><td id="roM"></td></tr>
+      <tr><td>Difference from previous homologue</td><td id="roDM"></td></tr>
+      <tr><td>C–C bonds</td><td id="roCC"></td></tr>
+      <tr><td>C–H bonds</td><td id="roCH"></td></tr>
+      <tr><td>Total covalent bonds (shared pairs)</td><td id="roB"></td></tr>
+      <tr><td>Total shared electrons</td><td id="roE"></td></tr>
+      <tr><td>Structural isomers (alkane, table)</td><td id="roIso"></td></tr>
+      <tr><td>Boiling point of straight-chain alkane (table)</td><td id="roBP"></td></tr>
+      <tr><td>Valency check</td><td id="roVal"></td></tr>
+    </table>
+    <h2 style="margin-top:12px">Governing equations</h2>
+    <div class="eq" id="eqBox"></div>
+  </section>
+
+  <section class="card">
+    <h2>What to observe</h2>
+    <ul>
+      <li>Every carbon always shows exactly 4 bonds and every hydrogen exactly 1 — count the dot pairs in electron-dot mode.</li>
+      <li>Moving n up by 1 adds exactly one CH<sub>2</sub> group: the formula grows by CH<sub>2</sub> and the molar mass by 14 u every time.</li>
+      <li>Boiling point rises gradually and smoothly with n — a gradation in physical properties along the series.</li>
+      <li>For n = 4 and n = 5 the isomer slider changes the shape (branching) but not the formula C<sub>4</sub>H<sub>10</sub> / C<sub>5</sub>H<sub>12</sub>.</li>
+      <li>Switching to alkene or alkyne removes 2 H each time, because a double or triple bond uses more of carbon's 4 valences.</li>
+    </ul>
+    <h2 style="margin-top:10px">Common misconceptions</h2>
+    <ul>
+      <li><b>“Carbon forms ions (C<sup>4+</sup> or C<sup>4−</sup>).”</b> It does not; it shares electrons, because gaining or losing 4 electrons is energetically unfavourable.</li>
+      <li><b>“Isomers are the same compound drawn differently.”</b> Propane's chain drawn bent is still propane; true isomers (n ≥ 4) have different connectivity and different properties.</li>
+      <li><b>“Homologues differ by one atom.”</b> They differ by a whole CH<sub>2</sub> unit, 14 u.</li>
+      <li><b>“A double bond is stronger, so it has more hydrogens.”</b> A double bond uses two valences of each carbon, so alkenes have fewer H than alkanes.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Check your understanding</h2>
+    <div id="qBox"></div>
+  </section>
+</main>
+
+<script>
+(function(){
+  // ---------- Data (lookup tables from blueprint) ----------
+  const ISO = [1,1,1,2,3,5,9,18,35,75];
+  const BP  = [-162,-89,-42,-0.5,36,69,98,126,151,174];
+  const PRE = ['meth','eth','prop','but','pent','hex','hept','oct','non','dec'];
+  const ISO_NAMES = {
+    4:['butane','2-methylpropane (isobutane)'],
+    5:['pentane','2-methylbutane (isopentane)','2,2-dimethylpropane (neopentane)']
+  };
+
+  // ---------- State ----------
+  const S = { n:4, k:0, i:1, d:0, t:0, prevN:4, anim:null };
+  let mol = null;
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  // ---------- Chemistry helpers ----------
+  const Hcount = (n,k) => 2*n + 2 - 2*k;
+  const Mass = (n,k) => 12*n + Hcount(n,k);
+  const minN = k => (k>0 ? 2 : 1);
+
+  function nameOf(n,k,i){
+    if (k===0){
+      if ((n===4||n===5) && ISO_NAMES[n][i-1]) return ISO_NAMES[n][i-1];
+      return PRE[n-1] + 'ane';
+    }
+    const end = k===1 ? 'ene' : 'yne';
+    if (n===2) return 'eth'+end;
+    if (n===3) return 'prop'+end;
+    const simple = PRE[n-1] + end;
+    return simple + ' (' + PRE[n-1] + '-1-' + end + ')';
+  }
+  function formulaHTML(n,H){
+    return 'C' + (n>1?'<sub>'+n+'</sub>':'') + 'H<sub>'+H+'</sub>';
+  }
+
+  // ---------- Build molecule geometry ----------
+  const G = 60;          // C–C spacing (px)
+  const HL = 38;         // C–H distance (px)
+  const DIRS = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+
+  function build(){
+    const {n,k,i} = S;
+    let cpos, cb;
+    if (k===0 && n===4 && i===2){
+      cpos=[[0,0],[1,0],[2,0],[1,1]]; cb=[[0,1,1],[1,2,1],[1,3,1]];
+    } else if (k===0 && n===5 && i===2){
+      cpos=[[0,0],[1,0],[2,0],[3,0],[1,1]]; cb=[[0,1,1],[1,2,1],[2,3,1],[1,4,1]];
+    } else if (k===0 && n===5 && i===3){
+      cpos=[[0,0],[1,0],[2,0],[1,1],[1,-1]]; cb=[[0,1,1],[1,2,1],[1,3,1],[1,4,1]];
+    } else {
+      cpos=[]; cb=[];
+      for (let j=0;j<n;j++) cpos.push([j,0]);
+      for (let j=0;j<n-1;j++) cb.push([j,j+1, j===0 ? 1+k : 1]);
+    }
+    const straight = !(k===0 && ((n===4&&i>=2)||(n===5&&i>=2)));
+    const atoms=[], bonds=[];
+    cpos.forEach((p,j)=>atoms.push({x:p[0]*G,y:p[1]*G,el:'C',owner:j}));
+    cb.forEach(b=>bonds.push({a:b[0],b:b[1],o:b[2]}));
+    const m = cpos.length;
+    for (let j=0;j<m;j++){
+      let sum=0, triple=false; const occ=new Set();
+      cb.forEach(b=>{
+        if (b[0]===j||b[1]===j){
+          sum+=b[2]; if (b[2]===3) triple=true;
+          const other = b[0]===j?b[1]:b[0];
+          const dx=cpos[other][0]-cpos[j][0], dy=cpos[other][1]-cpos[j][1];
+          occ.add(dx===1?'right':dx===-1?'left':dy===1?'down':'up');
+        }
+      });
+      const order = triple ? ['left','right','up','down'] : ['up','down','left','right'];
+      const need = 4 - sum;
+      const free = order.filter(d=>!occ.has(d)).slice(0,need);
+      free.forEach(d=>{
+        const v=DIRS[d];
+        atoms.push({x:atoms[j].x+v[0]*HL, y:atoms[j].y+v[1]*HL, el:'H', owner:j});
+        bonds.push({a:j,b:atoms.length-1,o:1});
+      });
+    }
+    // centre in top area
+    let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
+    atoms.forEach(a=>{minx=Math.min(minx,a.x);maxx=Math.max(maxx,a.x);miny=Math.min(miny,a.y);maxy=Math.max(maxy,a.y);});
+    const ox=400-(minx+maxx)/2, oy=140-(miny+maxy)/2;
+    atoms.forEach(a=>{a.x+=ox;a.y+=oy;});
+    // valency check
+    const val = atoms.map(()=>0);
+    bonds.forEach(b=>{val[b.a]+=b.o; val[b.b]+=b.o;});
+    let ok=true;
+    atoms.forEach((a,idx)=>{ if ((a.el==='C'&&val[idx]!==4)||(a.el==='H'&&val[idx]!==1)) ok=false; });
+    mol = {atoms,bonds,straight,ok,nC:m,nH:atoms.length-m};
+  }
+
+  // ---------- Update (on any control change) ----------
+  function update(){
+    // clamp rules
+    let note='';
+    if (S.k>0 && S.n<2){ S.n=2; note='Alkenes/alkynes need at least 2 carbons, so n is set to 2.'; }
+    const isoAllowed = S.k===0 && (S.n===4||S.n===5);
+    if (!isoAllowed) S.i=1;
+    else { const maxI = ISO[S.n-1]; if (S.i>maxI) S.i=maxI; }
+
+    $('nSl').value=S.n; $('nVal').textContent=S.n; $('nNote').textContent=note;
+    const iSl=$('iSl');
+    iSl.disabled=!isoAllowed;
+    iSl.max = isoAllowed ? ISO[S.n-1] : 3;
+    iSl.value=S.i; $('iVal').textContent=S.i;
+    $('iNote').textContent = isoAllowed ? ('n = '+S.n+' has '+ISO[S.n-1]+' structural isomers: slide to change the branching')
+                                        : 'Enabled only for alkanes with n = 4 or 5';
+    ['k0','k1','k2'].forEach((id,j)=>$(id).classList.toggle('on',S.k===j));
+    $('dBtn').textContent = S.d ? 'Show line structure' : 'Show electron dot structure';
+    $('dNote').textContent = S.d ? 'd = 1: electron dot structure (each pair of dots = one shared pair)' : 'd = 0: line structure (each line = one shared pair)';
+
+    // start slide-in animation if n increased
+    if (S.n > S.prevN) S.anim = {start:S.t, owner:S.n-1};
+    else if (S.n !== S.prevN) S.anim = null;
+    S.prevN = S.n;
+
+    build();
+
+    const {n,k,i}=S;
+    const H=Hcount(n,k), M=Mass(n,k);
+    const CC=n-1, CH=H;
+    const pairs = CC + k + CH;            // double bond = 2 pairs, triple = 3 pairs
+    const shared = 2*pairs;
+    $('roF').innerHTML = formulaHTML(n,H);
+    $('roName').textContent = nameOf(n,k,i);
+    $('roM').textContent = 'M = 12×'+n+' + 1×'+H+' = '+M+' u';
+    if (n-1 >= minN(k)) $('roDM').textContent = M+' − '+Mass(n-1,k)+' = '+(M-Mass(n-1,k))+' u (one CH₂)';
+    else $('roDM').textContent = '— (first member of this series)';
+    let ccTxt = CC + (CC===1?' link':' links');
+    if (k===1) ccTxt += ' (1 double C=C, '+(CC-1)+' single)';
+    else if (k===2) ccTxt += ' (1 triple C≡C, '+(CC-1)+' single)';
+    else ccTxt += ' single';
+    $('roCC').textContent = ccTxt;
+    $('roCH').textContent = CH;
+    $('roB').textContent = k===0 ? (pairs+'  (= 3n + 1 = 3×'+n+' + 1)') :
+        (pairs+'  (= '+(CC-1)+' single + '+(k+1)+' in the '+(k===1?'double':'triple')+' bond + '+CH+' C–H)');
+    $('roE').textContent = shared+' electrons (= 2 × '+pairs+')';
+    $('roIso').textContent = k===0 ? ISO[n-1] : '— (table given for alkanes only)';
+    $('roBP').textContent = k===0 ? (BP[n-1]+' °C'+((n===4||n===5)&&i>1?' (value for the straight-chain isomer)':'')) : '—';
+    $('roVal').innerHTML = mol.ok ? '<span class="ok">every C has 4 bonds ✓, every H has 1 bond ✓</span>' : 'error';
+
+    $('eqBox').textContent =
+      'H = 2n + 2 − 2k = 2×'+n+' + 2 − 2×'+k+' = '+H+'\n'+
+      'M = 12n + 1·H = 12×'+n+' + '+H+' = '+M+' u\n'+
+      'ΔM (successive homologues) = 14 u  (one CH₂ = 12 + 2)\n'+
+      'Alkane bonds: C–C = n − 1, C–H = 2n + 2, total = 3n + 1\n'+
+      (k===0 ? '  → for n = '+n+': '+(n-1)+' + '+(2*n+2)+' = '+(3*n+1)+' shared pairs\n'
+             : '  (this is an '+(k===1?'alkene':'alkyne')+': '+pairs+' shared pairs)\n')+
+      'Shared electrons = 2 × bonds = '+shared+'\n'+
+      'Check: valence electrons 4×'+n+' + 1×'+H+' = '+(4*n+H)+' = '+shared;
+  }
+
+  // ---------- Drawing ----------
+  function atomPos(a){
+    let x=a.x, y=a.y, alpha=1;
+    if (S.anim && mol.straight && a.owner===S.anim.owner){
+      const tau=S.t-S.anim.start;
+      const p=Math.min(1,tau/0.5);
+      const x0=a.x+70, x1=a.x;
+      x = x0 + (x1-x0)*p;
+      alpha = 0.3+0.7*p;
+    }
+    return {x,y,alpha};
+  }
+
+  function drawFormulaText(n,H,x,y,size){
+    ctx.font='bold '+size+'px Segoe UI, Arial';
+    ctx.textBaseline='alphabetic';
+    let cx=x;
+    const part=(txt,sub)=>{
+      ctx.font=(sub?'bold '+Math.round(size*0.65):'bold '+size)+'px Segoe UI, Arial';
+      ctx.fillText(txt,cx,sub?y+size*0.25:y);
+      cx+=ctx.measureText(txt).width;
+    };
+    part('C',false); if(n>1) part(String(n),true);
+    part('H',false); part(String(H),true);
+    return cx;
+  }
+
+  function drawMolecule(){
+    const r = 3 + 0.8*Math.sin(2*Math.PI*S.t);   // pulsing dot radius
+    const P = mol.atoms.map(atomPos);
+    // bonds
+    mol.bonds.forEach(b=>{
+      const A=P[b.a], B=P[b.b];
+      const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||1;
+      const ux=dx/L, uy=dy/L, px=-uy, py=ux;
+      const alpha=Math.min(A.alpha,B.alpha);
+      ctx.globalAlpha=alpha;
+      if (!S.d){
+        ctx.strokeStyle='#39414f'; ctx.lineWidth=2.4;
+        const offs = b.o===1?[0]:b.o===2?[-4,4]:[-6,0,6];
+        offs.forEach(o=>{
+          ctx.beginPath();
+          ctx.moveTo(A.x+px*o,A.y+py*o); ctx.lineTo(B.x+px*o,B.y+py*o); ctx.stroke();
+        });
+      } else {
+        const mx=(A.x+B.x)/2, my=(A.y+B.y)/2;
+        const along = b.o===1?[0]:b.o===2?[-4.5,4.5]:[-9,0,9];
+        along.forEach(s=>{
+          [-1,1].forEach(side=>{
+            const x=mx+ux*s+px*side*4.6, y=my+uy*s+py*side*4.6;
+            ctx.beginPath(); ctx.arc(x,y,r,0,2*Math.PI);
+            ctx.fillStyle='#d62c1f'; ctx.fill();
+            ctx.lineWidth=0.8; ctx.strokeStyle='#7b1209'; ctx.stroke();
+          });
+        });
+      }
+      ctx.globalAlpha=1;
+    });
+    // highlight of newly added CH2 unit
+    if (S.anim && mol.straight){
+      const tau=S.t-S.anim.start;
+      if (tau<1.6){
+        const c = mol.atoms.findIndex(a=>a.el==='C'&&a.owner===S.anim.owner);
+        if (c>=0){
+          const p=P[c];
+          ctx.globalAlpha=Math.max(0,1-tau/1.6);
+          ctx.strokeStyle='#e67e22'; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.ellipse(p.x,p.y,36,52,0,0,2*Math.PI); ctx.stroke();
+          ctx.fillStyle='#e67e22'; ctx.font='bold 15px Segoe UI, Arial'; ctx.textAlign='center';
+          ctx.fillText('+ CH₂', p.x, p.y-60);
+          ctx.globalAlpha=1; ctx.textAlign='left';
+        }
+      }
+    }
+    // atoms
+    mol.atoms.forEach((a,idx)=>{
+      const p=P[idx];
+      ctx.globalAlpha=p.alpha;
+      ctx.beginPath();
+      if (a.el==='C'){
+        ctx.arc(p.x,p.y,13,0,2*Math.PI); ctx.fillStyle='#161a22'; ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='bold 13px Segoe UI, Arial';
+      } else {
+        ctx.arc(p.x,p.y,9,0,2*Math.PI); ctx.fillStyle='#b5bcc8'; ctx.fill();
+        ctx.lineWidth=1; ctx.strokeStyle='#7d8595'; ctx.stroke();
+        ctx.fillStyle='#1f2633'; ctx.font='bold 10px Segoe UI, Arial';
+      }
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(a.el,p.x,p.y+0.5);
+      ctx.globalAlpha=1;
+    });
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  }
+
+  function drawHeader(){
+    const H=Hcount(S.n,S.k);
+    ctx.fillStyle='#1f2633';
+    const endX = drawFormulaText(S.n,H,16,28,20);
+    ctx.font='15px Segoe UI, Arial'; ctx.fillStyle='#5b6474';
+    ctx.fillText('  —  '+nameOf(S.n,S.k,S.i), endX, 28);
+    ctx.font='12px Segoe UI, Arial';
+    ctx.fillText(S.d ? 'Electron dot structure: each pair of red dots = one shared pair = one covalent bond'
+                     : 'Line structure: each line = one covalent bond (shared pair of electrons)', 16, 48);
+    ctx.fillStyle='#1e8449'; ctx.font='bold 13px Segoe UI, Arial';
+    ctx.fillText('Valency check: every C has 4 bonds ✓   every H has 1 bond ✓', 16, 262);
+    // legend
+    ctx.font='12px Segoe UI, Arial'; ctx.fillStyle='#5b6474';
+    ctx.beginPath(); ctx.arc(652,22,8,0,2*Math.PI); ctx.fillStyle='#161a22'; ctx.fill();
+    ctx.fillStyle='#5b6474'; ctx.fillText('C (valency 4)',665,26);
+    ctx.beginPath(); ctx.arc(652,42,6,0,2*Math.PI); ctx.fillStyle='#b5bcc8'; ctx.fill();
+    ctx.fillStyle='#5b6474'; ctx.fillText('H (valency 1)',665,46);
+  }
+
+  function drawBars(){
+    const {n,k}=S;
+    ctx.strokeStyle='#d8dde6'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(10,274); ctx.lineTo(790,274); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(410,282); ctx.lineTo(410,414); ctx.stroke();
+    ctx.fillStyle='#2c3e75'; ctx.font='bold 13px Segoe UI, Arial';
+    ctx.fillText('Molar mass of neighbouring homologues (u)',20,294);
+    const base=392, maxH=72;
+    const list=[n-1,n,n+1];
+    const Mmax=Mass(n+1,k);
+    const xs=[70,195,320], w=60;
+    list.forEach((m,j)=>{
+      const x=xs[j];
+      if (m<minN(k)){
+        ctx.fillStyle='#9aa3b2'; ctx.font='12px Segoe UI, Arial'; ctx.textAlign='center';
+        ctx.fillText('— none —',x+w/2,base-8);
+        ctx.fillText('(n = '+m+')',x+w/2,base+14);
+        ctx.textAlign='left';
+        return;
+      }
+      const M=Mass(m,k); const h=M/Mmax*maxH;
+      ctx.fillStyle = j===1 ? '#c0392b' : '#8fa3c9';
+      ctx.fillRect(x,base-h,w,h);
+      ctx.fillStyle='#1f2633'; ctx.font='bold 12px Segoe UI, Arial'; ctx.textAlign='center';
+      ctx.fillText(M+' u',x+w/2,base-h-4);
+      ctx.textAlign='left';
+      ctx.fillStyle='#1f2633';
+      const Hm=Hcount(m,k);
+      // centre formula
+      ctx.font='bold 12px Segoe UI, Arial';
+      const approxW = ctx.measureText('C'+(m>1?m:'')+'H'+Hm).width*0.9;
+      drawFormulaText(m,Hm,x+w/2-approxW/2,base+14,12);
+    });
+    // +14 u labels
+    ctx.font='bold 12px Segoe UI, Arial'; ctx.fillStyle='#e67e22'; ctx.textAlign='center';
+    for (let j=0;j<2;j++){
+      if (list[j]<minN(k)) continue;
+      const xm=(xs[j]+w+xs[j+1])/2;
+      ctx.fillText('+14 u',xm,base-44);
+      ctx.fillText('(+CH₂)',xm,base-30);
+      ctx.strokeStyle='#e67e22'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(xm-22,base-22); ctx.lineTo(xm+22,base-22); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(xm+22,base-22); ctx.lineTo(xm+16,base-26); ctx.lineTo(xm+16,base-18); ctx.closePath(); ctx.fillStyle='#e67e22'; ctx.fill();
+    }
+    ctx.textAlign='left';
+  }
+
+  function drawBP(){
+    const x0=462, x1=770, yTop=306, yBot=392, vMin=-170, vMax=180;
+    const X=m=>x0+(m-1)/9*(x1-x0);
+    const Y=v=>yBot-(v-vMin)/(vMax-vMin)*(yBot-yTop);
+    ctx.fillStyle='#2c3e75'; ctx.font='bold 13px Segoe UI, Arial';
+    ctx.fillText('Boiling point of straight-chain alkanes (°C)',425,294);
+    // axes
+    ctx.strokeStyle='#9aa3b2'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0-8,yTop-4); ctx.lineTo(x0-8,yBot); ctx.lineTo(x1+8,yBot); ctx.stroke();
+    ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(x0-8,Y(0)); ctx.lineTo(x1+8,Y(0)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#5b6474'; ctx.font='10px Segoe UI, Arial'; ctx.textAlign='right';
+    [-150,0,150].forEach(v=>ctx.fillText(v,x0-11,Y(v)+3));
+    ctx.textAlign='center';
+    for (let m=1;m<=10;m++) ctx.fillText(m,X(m),yBot+12);
+    ctx.fillText('n',x1+18,yBot+12);
+    // line
+    ctx.strokeStyle='#8fa3c9'; ctx.lineWidth=1.5; ctx.beginPath();
+    for (let m=1;m<=10;m++){ const x=X(m),y=Y(BP[m-1]); m===1?ctx.moveTo(x,y):ctx.lineTo(x,y);} ctx.stroke();
+    for (let m=1;m<=10;m++){
+      const cur = S.k===0 && m===S.n;
+      ctx.beginPath(); ctx.arc(X(m),Y(BP[m-1]),cur?6.5:3.5,0,2*Math.PI);
+      ctx.fillStyle = cur ? '#c0392b' : '#2c3e75'; ctx.fill();
+      if (cur){
+        ctx.fillStyle='#c0392b'; ctx.font='bold 11px Segoe UI, Arial';
+        const lx = m>7 ? X(m)-4 : X(m)+4;
+        ctx.textAlign = m>7 ? 'right':'left';
+        ctx.fillText(BP[m-1]+' °C', lx, Y(BP[m-1])-9);
+      }
+    }
+    ctx.textAlign='left';
+    if (S.k!==0){
+      ctx.fillStyle='#5b6474'; ctx.font='italic 11px Segoe UI, Arial';
+      ctx.fillText('(alkane data shown for comparison)',560,yTop+2);
+    }
+  }
+
+  function frame(){
+    S.t += 1/60;
+    ctx.clearRect(0,0,800,420);
+    drawHeader();
+    drawMolecule();
+    drawBars();
+    drawBP();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Controls ----------
+  $('nSl').addEventListener('input',e=>{ S.n=parseInt(e.target.value,10); update(); });
+  $('iSl').addEventListener('input',e=>{ S.i=parseInt(e.target.value,10); S.anim=null; update(); });
+  [0,1,2].forEach(j=>$('k'+j).addEventListener('click',()=>{ S.k=j; S.anim=null; update(); }));
+  $('dBtn').addEventListener('click',()=>{ S.d = S.d?0:1; update(); });
+
+  // ---------- Questions ----------
+  const QS = [
+    {q:"What is the molecular formula of the alkane with 7 carbon atoms?",
+     options:["C7H14","C7H16","C7H12","C7H18"], answer:"C7H16",
+     explanation:"Alkanes follow CnH2n+2; for n=7, H = 2×7+2 = 16."},
+    {q:"How many covalent bonds (shared pairs) are there in one molecule of ethane, C2H6?",
+     options:["6","7","8","14"], answer:"7",
+     explanation:"One C–C bond plus six C–H bonds = 3n+1 = 7 shared pairs, i.e. 14 shared electrons."},
+    {q:"Butane and 2-methylpropane (isobutane) both have formula C4H10. They are called:",
+     options:["Homologues","Allotropes","Structural isomers","Ions"], answer:"Structural isomers",
+     explanation:"Same molecular formula but different arrangement of atoms (straight vs branched chain)."}
+  ];
+  const pretty = s => s.replace(/([CH])(\d+)/g,'$1<sub>$2</sub>');
+  const qBox=$('qBox');
+  QS.forEach((Q,qi)=>{
+    const d=document.createElement('div'); d.className='q';
+    d.innerHTML='<p>Q'+(qi+1)+'. '+pretty(Q.q)+'</p>';
+    const o=document.createElement('div'); o.className='opts';
+    const ex=document.createElement('div'); ex.className='exp';
+    ex.innerHTML='<b>Answer: '+pretty(Q.answer)+'.</b> '+pretty(Q.explanation);
+    Q.options.forEach(opt=>{
+      const b=document.createElement('button'); b.innerHTML=pretty(opt);
+      b.addEventListener('click',()=>{
+        [...o.children].forEach(c=>c.classList.remove('right','wrong'));
+        b.classList.add(opt===Q.answer?'right':'wrong');
+        if (opt!==Q.answer){
+          [...o.children].forEach((c,ci)=>{ if (Q.options[ci]===Q.answer) c.classList.add('right'); });
+        }
+        ex.classList.add('show');
+      });
+      o.appendChild(b);
+    });
+    const rv=document.createElement('button'); rv.textContent='Reveal answer'; rv.style.marginTop='6px';
+    rv.addEventListener('click',()=>ex.classList.toggle('show'));
+    d.appendChild(o); d.appendChild(rv); d.appendChild(ex); qBox.appendChild(d);
+  });
+
+  update();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

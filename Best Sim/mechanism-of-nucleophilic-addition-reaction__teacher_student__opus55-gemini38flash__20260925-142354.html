@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mechanism of Nucleophilic Addition: HCN to Carbonyls</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #f59e0b;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 16px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    header {
+      background: var(--card-bg);
+      padding: 16px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+    header h1 {
+      font-size: 1.4rem;
+      color: #38bdf8;
+      margin-bottom: 4px;
+    }
+    header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 1.15fr 0.85fr;
+      }
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    canvas {
+      width: 100%;
+      height: 280px;
+      background: #090d16;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      display: block;
+    }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 600px) {
+      .controls-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-group label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    .control-group label span.val {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    input[type=range] {
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+    .btn-group {
+      display: flex;
+      gap: 6px;
+    }
+    button.sub-btn, button.action-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid var(--card-border);
+      background: #0f172a;
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    button.sub-btn.active {
+      background: #38bdf8;
+      color: #0f172a;
+      border-color: #38bdf8;
+      font-weight: 700;
+    }
+    button.action-btn.primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    button.action-btn.primary:hover {
+      background: #1d4ed8;
+    }
+    button.action-btn.secondary {
+      background: #475569;
+      border-color: #64748b;
+      color: #fff;
+    }
+    button.action-btn.secondary:hover {
+      background: #334155;
+    }
+    .readouts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      background: #090d16;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+    @media (min-width: 500px) {
+      .readouts-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    .readout-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .readout-item .lbl {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .readout-item .num {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #38bdf8;
+      font-family: monospace;
+    }
+    .equations-box {
+      font-size: 0.8rem;
+      background: #090d16;
+      padding: 10px;
+      border-radius: 6px;
+      border-left: 3px solid #38bdf8;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: monospace;
+    }
+    .info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .observations-list {
+      list-style-type: disc;
+      padding-left: 20px;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .qa-card {
+      background: #090d16;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .qa-card p.q-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .qa-options {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .qa-option-btn {
+      text-align: left;
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: #cbd5e1;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .qa-option-btn:hover {
+      background: #334155;
+    }
+    .qa-explanation {
+      display: none;
+      font-size: 0.78rem;
+      padding: 6px;
+      border-radius: 4px;
+      line-height: 1.35;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-sp2 {
+      background: #818cf8;
+      color: #0f172a;
+    }
+    .badge-sp3 {
+      background: #34d399;
+      color: #0f172a;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Nucleophilic Addition to Carbonyl Group: HCN Addition</h1>
+    <p>NCERT Chemistry Class 12: Aldehydes, Ketones and Carboxylic Acids (Sec 8.4) & Chemical Kinetics (Arrhenius Equation)</p>
+  </header>
+
+  <div class="grid">
+    <!-- Left Panel: Animation & Controls -->
+    <div class="card">
+      <div class="card-title">
+        <span>Reaction Mechanism Animation</span>
+        <span id="hybridBadge" class="badge badge-sp2">sp² Trigonal Planar</span>
+      </div>
+      <canvas id="mechCanvas" width="600" height="280"></canvas>
+
+      <!-- Controls -->
+      <div class="controls-grid">
+        <div class="control-group">
+          <label>Substrate: <span id="subLabel" class="val">Ethanal (CH₃CHO)</span></label>
+          <div class="btn-group">
+            <button class="sub-btn" data-sub="0">HCHO</button>
+            <button class="sub-btn active" data-sub="1">CH₃CHO</button>
+            <button class="sub-btn" data-sub="2">CH₃COCH₃</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Temperature (T): <span id="tVal" class="val">298 K</span></label>
+          <input type="range" id="tSlider" min="280" max="350" step="1" value="298">
+        </div>
+
+        <div class="control-group">
+          <label>Medium pH: <span id="phVal" class="val">9.0</span></label>
+          <input type="range" id="phSlider" min="4" max="12" step="0.1" value="9.0">
+        </div>
+
+        <div class="control-group">
+          <label>Initial [C=O] (C₀): <span id="c0Val" class="val">0.50 mol/L</span></label>
+          <input type="range" id="c0Slider" min="0.1" max="1.0" step="0.05" value="0.50">
+        </div>
+      </div>
+
+      <div class="btn-group" style="margin-top: 4px;">
+        <button id="btnPlayPause" class="action-btn primary">Pause</button>
+        <button id="btnReset" class="action-btn secondary">Reset Reaction</button>
+      </div>
+
+      <div class="readouts-grid">
+        <div class="readout-item">
+          <span class="lbl">Rate Constant (k)</span>
+          <span id="readoutK" class="num">0.00 M⁻¹s⁻¹</span>
+        </div>
+        <div class="readout-item">
+          <span class="lbl">Nucleophile [CN⁻]</span>
+          <span id="readoutCN" class="num">0.00 M</span>
+        </div>
+        <div class="readout-item">
+          <span class="lbl">Rate (k·[C]·[CN⁻])</span>
+          <span id="readoutRate" class="num">0.00 M/s</span>
+        </div>
+        <div class="readout-item">
+          <span class="lbl">Substrate [C=O]</span>
+          <span id="readoutC" class="num">0.50 M</span>
+        </div>
+        <div class="readout-item">
+          <span class="lbl">Product [Cyanohydrin]</span>
+          <span id="readoutP" class="num">0.00 M</span>
+        </div>
+        <div class="readout-item">
+          <span class="lbl">Conversion</span>
+          <span id="readoutConv" class="num">0.0 %</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Kinetics Plot & Equations & Q/A -->
+    <div class="card">
+      <div class="card-title">Reaction Kinetics: Concentration vs Time</div>
+      <canvas id="kineticsCanvas" width="500" height="200"></canvas>
+
+      <div class="equations-box">
+        <div><strong>Step 1 (Slow, RDS):</strong> R₂C=O + :CN⁻ → R₂C(O⁻)CN &nbsp;<i>[sp² → sp³]</i></div>
+        <div><strong>Step 2 (Fast):</strong> R₂C(O⁻)CN + H⁺ → R₂C(OH)CN &nbsp;<i>[Cyanohydrin]</i></div>
+        <div><strong>Rate Law:</strong> Rate = k [R₂C=O] [CN⁻]</div>
+        <div><strong>Arrhenius:</strong> k = A · exp(-Eₐ / RT) &nbsp;(A = 10⁹ M⁻¹s⁻¹)</div>
+        <div><strong>Base Catalysis:</strong> [CN⁻] = C_HCN · Kₐ / (Kₐ + [H⁺]) &nbsp;(pKₐ = 9.2)</div>
+      </div>
+
+      <div class="info-section">
+        <div style="font-size:0.9rem; font-weight:600; color:#38bdf8;">What to Observe:</div>
+        <ul class="observations-list">
+          <li><strong>Hybridisation Shift:</strong> Planar sp² carbonyl carbon (120°) puckers into a tetrahedral sp³ alkoxide (109.5°) upon nucleophilic attack.</li>
+          <li><strong>Base Catalysis:</strong> Raising pH above 9 dramatically ionises HCN, boosting [CN⁻] and acceleration.</li>
+          <li><strong>Reactivity Order:</strong> HCHO (Ea = 40 kJ) &gt; CH₃CHO (50 kJ) &gt; CH₃COCH₃ (60 kJ) due to steric hindrance and +I electronic relief.</li>
+          <li><strong>Temperature Effect:</strong> Increasing T exponentially raises rate constant <i>k</i>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conceptual Understanding Section -->
+  <div class="card">
+    <div class="card-title">Check Your Understanding</div>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+      <!-- Q1 -->
+      <div class="qa-card" id="q1">
+        <p class="q-text">1. Which step is rate-determining in HCN addition?</p>
+        <div class="qa-options">
+          <button class="qa-option-btn" data-ans="Protonation of alkoxide">Protonation of alkoxide</button>
+          <button class="qa-option-btn" data-ans="Attack of CN- on carbonyl carbon">Attack of CN⁻ on carbonyl carbon</button>
+          <button class="qa-option-btn" data-ans="Loss of water">Loss of water</button>
+          <button class="qa-option-btn" data-ans="Protonation of carbonyl O">Protonation of carbonyl O</button>
+        </div>
+        <div class="qa-explanation"></div>
+      </div>
+      <!-- Q2 -->
+      <div class="qa-card" id="q2">
+        <p class="q-text">2. Why does a trace of base speed up the reaction?</p>
+        <div class="qa-options">
+          <button class="qa-option-btn" data-ans="It protonates C=O">It protonates C=O</button>
+          <button class="qa-option-btn" data-ans="It raises [CN-] from weakly ionised HCN">It raises [CN⁻] from weakly ionised HCN</button>
+          <button class="qa-option-btn" data-ans="It lowers T">It lowers T</button>
+          <button class="qa-option-btn" data-ans="It changes the product">It changes the product</button>
+        </div>
+        <div class="qa-explanation"></div>
+      </div>
+      <!-- Q3 -->
+      <div class="qa-card" id="q3">
+        <p class="q-text">3. Why is propanone less reactive than ethanal?</p>
+        <div class="qa-options">
+          <button class="qa-option-btn" data-ans="Two alkyl groups add steric hindrance and reduce the δ+ on C">Two alkyl groups add steric hindrance &amp; reduce δ⁺ on C</button>
+          <button class="qa-option-btn" data-ans="Propanone has no C=O">Propanone has no C=O</button>
+          <button class="qa-option-btn" data-ans="Ethanal is a stronger acid">Ethanal is a stronger acid</button>
+          <button class="qa-option-btn" data-ans="Propanone is sp3">Propanone is sp³</button>
+        </div>
+        <div class="qa-explanation"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Constants and Simulation State ---
+const R = 8.314; // J/(mol*K)
+const A = 1e9;   // M^-1 s^-1
+const Ka = 6.2e-10; // pKa = 9.2
+const C_HCN = 1.0;  // constant reservoir
+const dt = 0.02; // seconds per physics update
+
+const SUBSTRATES = [
+  { name: "Methanal (HCHO)", r1: "H", r2: "H", ea: 40000 },
+  { name: "Ethanal (CH₃CHO)", r1: "CH₃", r2: "H", ea: 50000 },
+  { name: "Propanone (CH₃COCH₃)", r1: "CH₃", r2: "CH₃", ea: 60000 }
+];
+
+let state = {
+  T: 298,
+  pH: 9.0,
+  subIdx: 1,
+  C0: 0.50,
+  concC: 0.50,
+  concP: 0.0,
+  simTime: 0,
+  running: true,
+  history: [] // {t, c, p}
+};
+
+// Animation state for mechanism visualization
+let animPhase = 0; // 0 to 4 looping sequence
+
+// Elements
+const mechCanvas = document.getElementById("mechCanvas");
+const mechCtx = mechCanvas.getContext("2d");
+const kinCanvas = document.getElementById("kineticsCanvas");
+const kinCtx = kinCanvas.getContext("2d");
+
+const tSlider = document.getElementById("tSlider");
+const tVal = document.getElementById("tVal");
+const phSlider = document.getElementById("phSlider");
+const phVal = document.getElementById("phVal");
+const c0Slider = document.getElementById("c0Slider");
+const c0Val = document.getElementById("c0Val");
+const subLabel = document.getElementById("subLabel");
+const subBtns = document.querySelectorAll(".sub-btn");
+const btnPlayPause = document.getElementById("btnPlayPause");
+const btnReset = document.getElementById("btnReset");
+
+const readoutK = document.getElementById("readoutK");
+const readoutCN = document.getElementById("readoutCN");
+const readoutRate = document.getElementById("readoutRate");
+const readoutC = document.getElementById("readoutC");
+const readoutP = document.getElementById("readoutP");
+const readoutConv = document.getElementById("readoutConv");
+const hybridBadge = document.getElementById("hybridBadge");
+
+// Physics Computations
+function getK() {
+  const Ea = SUBSTRATES[state.subIdx].ea;
+  return A * Math.exp(-Ea / (R * state.T));
+}
+
+function getCN() {
+  const hPlus = Math.pow(10, -state.pH);
+  return (C_HCN * Ka) / (Ka + hPlus);
+}
+
+function getRate() {
+  return getK() * state.concC * getCN();
+}
+
+function resetSim() {
+  state.concC = state.C0;
+  state.concP = 0.0;
+  state.simTime = 0;
+  state.history = [{ t: 0, c: state.concC, p: 0 }];
+  animPhase = 0;
+}
+
+// Controls Listeners
+tSlider.addEventListener("input", (e) => {
+  state.T = parseFloat(e.target.value);
+  tVal.textContent = state.T + " K";
+});
+
+phSlider.addEventListener("input", (e) => {
+  state.pH = parseFloat(e.target.value);
+  phVal.textContent = state.pH.toFixed(1);
+});
+
+c0Slider.addEventListener("input", (e) => {
+  state.C0 = parseFloat(e.target.value);
+  c0Val.textContent = state.C0.toFixed(2) + " mol/L";
+  resetSim();
+});
+
+subBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    subBtns.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.subIdx = parseInt(btn.dataset.sub);
+    subLabel.textContent = SUBSTRATES[state.subIdx].name;
+    resetSim();
+  });
+});
+
+btnPlayPause.addEventListener("click", () => {
+  state.running = !state.running;
+  btnPlayPause.textContent = state.running ? "Pause" : "Resume";
+  btnPlayPause.className = state.running ? "action-btn primary" : "action-btn secondary";
+});
+
+btnReset.addEventListener("click", resetSim);
+
+// Physics Loop
+function updatePhysics() {
+  if (!state.running) return;
+
+  const k = getK();
+  const cn = getCN();
+  
+  if (state.concC > 0.001 * state.C0) {
+    const rate = k * state.concC * cn;
+    const dn = rate * dt;
+    const actualDn = Math.min(dn, state.concC);
+    state.concC -= actualDn;
+    state.concP += actualDn;
+    state.simTime += dt;
+  }
+
+  // Update history buffer
+  const lastH = state.history[state.history.length - 1];
+  if (!lastH || state.simTime - lastH.t >= 0.1 || state.concC <= 0.001 * state.C0) {
+    state.history.push({ t: state.simTime, c: state.concC, p: state.concP });
+    if (state.history.length > 500) state.history.shift();
+  }
+
+  // Visual animation loop pacing tied to reaction speed
+  const rateSpeed = Math.min(Math.max(getRate() * 4, 0.4), 2.5);
+  animPhase = (animPhase + 0.015 * rateSpeed) % 4;
+}
+
+// Rendering Mechanism Animation
+function drawMechanism() {
+  const w = mechCanvas.width;
+  const h = mechCanvas.height;
+  mechCtx.clearRect(0, 0, w, h);
+
+  const cx = w * 0.45;
+  const cy = h * 0.52;
+
+  // animPhase ranges 0 -> 4:
+  // 0 -> 1.2: Approach of CN- along Burgi-Dunitz trajectory (~107° to C=O)
+  // 1.2 -> 2.2: C=O pi shifts to O, bonds form, angles relax to tetrahedral (109.5°)
+  // 2.2 -> 3.2: H+ approaches O- and forms O-H bond (Cyanohydrin product)
+  // 3.2 -> 4.0: Product display & transition back
+  const p = animPhase;
+  const sub = SUBSTRATES[state.subIdx];
+
+  let isSp3 = p >= 1.5 && p < 3.8;
+  hybridBadge.className = isSp3 ? "badge badge-sp3" : "badge badge-sp2";
+  hybridBadge.textContent = isSp3 ? "sp³ Tetrahedral Alkoxide" : "sp² Trigonal Planar (120°)";
+
+  // Angles and bond geometry
+  let angleR1, angleR2, angleO;
+  if (p < 1.0) {
+    // Trigonal planar: R1 at -150°, R2 at +150°, O at 0° (or symmetric)
+    angleR1 = (Math.PI * 5) / 6;  // 150 deg (down-left)
+    angleR2 = -(Math.PI * 5) / 6; // -150 deg (up-left)
+    angleO = 0;                  // right
+  } else if (p < 2.0) {
+    const t = p - 1.0;
+    // Transition from trigonal planar to tetrahedral
+    angleR1 = (Math.PI * 5) / 6 + t * 0.25;
+    angleR2 = -(Math.PI * 5) / 6 - t * 0.25;
+    angleO = t * 0.2;
+  } else {
+    // Tetrahedral orientation
+    angleR1 = (Math.PI * 5) / 6 + 0.25;
+    angleR2 = -(Math.PI * 5) / 6 - 0.25;
+    angleO = 0.2;
+  }
+
+  const bondLen = 65;
+
+  // Carbonyl C center
+  mechCtx.save();
+
+  // Draw Central Carbon
+  mechCtx.fillStyle = "#f8fafc";
+  mechCtx.beginPath();
+  mechCtx.arc(cx, cy, 14, 0, Math.PI * 2);
+  mechCtx.fill();
+  mechCtx.fillStyle = "#0f172a";
+  mechCtx.font = "bold 13px sans-serif";
+  mechCtx.textAlign = "center";
+  mechCtx.textBaseline = "middle";
+  mechCtx.fillText("C", cx, cy);
+
+  // Partial charge delta+ on C (fades as intermediate forms)
+  if (p < 1.5) {
+    mechCtx.fillStyle = "#38bdf8";
+    mechCtx.font = "11px sans-serif";
+    mechCtx.fillText("δ+", cx - 18, cy - 14);
+  }
+
+  // Draw Substituent R1
+  const xR1 = cx + bondLen * Math.cos(angleR1);
+  const yR1 = cy + bondLen * Math.sin(angleR1);
+  drawBond(cx, cy, xR1, yR1, 3, "#64748b");
+  drawAtom(xR1, yR1, sub.r1, "#94a3b8", "#0f172a");
+
+  // Draw Substituent R2
+  const xR2 = cx + bondLen * Math.cos(angleR2);
+  const yR2 = cy + bondLen * Math.sin(angleR2);
+  drawBond(cx, cy, xR2, yR2, 3, "#64748b");
+  drawAtom(xR2, yR2, sub.r2, "#94a3b8", "#0f172a");
+
+  // Draw Oxygen & C=O / C-O bond
+  const xO = cx + (bondLen + 5) * Math.cos(angleO);
+  const yO = cy + (bondLen + 5) * Math.sin(angleO);
+  if (p < 1.2) {
+    // Double bond C=O
+    drawDoubleBond(cx, cy, xO, yO, "#ef4444");
+  } else {
+    // Single bond C-O-
+    drawBond(cx, cy, xO, yO, 4, "#ef4444");
+  }
+  drawAtom(xO, yO, "O", "#ef4444", "#ffffff");
+
+  // Oxygen charge / state
+  if (p < 1.2) {
+    mechCtx.fillStyle = "#ef4444";
+    mechCtx.font = "11px sans-serif";
+    mechCtx.fillText("δ-", xO + 16, yO - 10);
+  } else if (p < 2.5) {
+    // Alkoxide negative charge
+    mechCtx.fillStyle = "#ef4444";
+    mechCtx.font = "bold 13px sans-serif";
+    mechCtx.fillText("⊖", xO + 16, yO - 10);
+  } else {
+    // Protonated to OH
+    const xH = xO + 28 * Math.cos(-0.4);
+    const yH = yO + 28 * Math.sin(-0.4);
+    drawBond(xO, yO, xH, yH, 2.5, "#cbd5e1");
+    drawAtom(xH, yH, "H", "#e2e8f0", "#0f172a", 10);
+  }
+
+  // Curved arrow for pi electron shift to O during attack
+  if (p >= 0.8 && p <= 1.5) {
+    drawCurvedArrow(cx + 10, cy - 8, xO - 2, yO - 12, "#fbbf24");
+  }
+
+  // Nucleophile CN- approach and bonding
+  // Trajectory: approaches from bottom-right (obtuse angle ~107° to C=O)
+  const cnStartX = cx + 110;
+  const cnStartY = cy + 100;
+  const cnFinalX = cx + bondLen * Math.cos(Math.PI * 0.42);
+  const cnFinalY = cy + bondLen * Math.sin(Math.PI * 0.42);
+
+  if (p < 1.4) {
+    const t = Math.min(Math.max(p / 1.2, 0), 1);
+    const curX = cnStartX + (cnFinalX - cnStartX) * t;
+    const curY = cnStartY + (cnFinalY - cnStartY) * t;
+
+    // Curved arrow from CN- lone pair to Carbonyl C
+    if (p > 0.3) {
+      drawCurvedArrow(curX - 8, curY - 8, cx + 6, cy + 12, "#38bdf8");
+    }
+    drawAtom(curX, curY, ":CN⁻", "#38bdf8", "#0f172a", 16);
+  } else {
+    // CN is bonded to Carbonyl C
+    drawBond(cx, cy, cnFinalX, cnFinalY, 3, "#38bdf8");
+    drawAtom(cnFinalX, cnFinalY, "CN", "#38bdf8", "#0f172a", 15);
+  }
+
+  // Proton (H+) for Step 2 (Protonation of alkoxide)
+  if (p >= 1.8 && p < 2.6) {
+    const tH = (p - 1.8) / 0.8;
+    const hStartX = xO + 60;
+    const hStartY = yO - 40;
+    const hFinalX = xO + 28 * Math.cos(-0.4);
+    const hFinalY = yO + 28 * Math.sin(-0.4);
+
+    const curHX = hStartX + (hFinalX - hStartX) * tH;
+    const curHY = hStartY + (hFinalY - hStartY) * tH;
+    drawAtom(curHX, curHY, "H⁺", "#e2e8f0", "#0f172a", 10);
+    drawCurvedArrow(xO + 6, yO - 8, curHX - 6, curHY + 6, "#fbbf24");
+  }
+
+  // Annotation label of step
+  mechCtx.fillStyle = "#94a3b8";
+  mechCtx.font = "12px sans-serif";
+  mechCtx.textAlign = "left";
+  if (p < 1.4) {
+    mechCtx.fillText("Step 1 (Slow): Nucleophile :CN⁻ attacks δ+ Carbon perpendicular to plane", 14, 25);
+  } else if (p < 2.4) {
+    mechCtx.fillText("Intermediate: Tetrahedral alkoxide intermediate [sp³ hybridization]", 14, 25);
+  } else {
+    mechCtx.fillText("Step 2 (Fast): Rapid protonation forms stable Cyanohydrin", 14, 25);
+  }
+
+  mechCtx.restore();
+}
+
+function drawAtom(x, y, label, bgColor, textColor, radius = 14) {
+  mechCtx.save();
+  mechCtx.fillStyle = bgColor;
+  mechCtx.beginPath();
+  mechCtx.arc(x, y, radius, 0, Math.PI * 2);
+  mechCtx.fill();
+  mechCtx.strokeStyle = "#1e293b";
+  mechCtx.lineWidth = 1.5;
+  mechCtx.stroke();
+
+  mechCtx.fillStyle = textColor;
+  mechCtx.font = "bold 11px sans-serif";
+  mechCtx.textAlign = "center";
+  mechCtx.textBaseline = "middle";
+  mechCtx.fillText(label, x, y);
+  mechCtx.restore();
+}
+
+function drawBond(x1, y1, x2, y2, width, color) {
+  mechCtx.save();
+  mechCtx.strokeStyle = color;
+  mechCtx.lineWidth = width;
+  mechCtx.lineCap = "round";
+  mechCtx.beginPath();
+  mechCtx.moveTo(x1, y1);
+  mechCtx.lineTo(x2, y2);
+  mechCtx.stroke();
+  mechCtx.restore();
+}
+
+function drawDoubleBond(x1, y1, x2, y2, color) {
+  mechCtx.save();
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  const offset = 4;
+  const ox = (-dy / len) * offset;
+  const oy = (dx / len) * offset;
+
+  mechCtx.strokeStyle = color;
+  mechCtx.lineWidth = 2.5;
+  mechCtx.lineCap = "round";
+
+  mechCtx.beginPath();
+  mechCtx.moveTo(x1 + ox, y1 + oy);
+  mechCtx.lineTo(x2 + ox, y2 + oy);
+  mechCtx.moveTo(x1 - ox, y1 - oy);
+  mechCtx.lineTo(x2 - ox, y2 - oy);
+  mechCtx.stroke();
+  mechCtx.restore();
+}
+
+function drawCurvedArrow(x1, y1, x2, y2, color) {
+  mechCtx.save();
+  mechCtx.strokeStyle = color;
+  mechCtx.fillStyle = color;
+  mechCtx.lineWidth = 2;
+  const midX = (x1 + x2) / 2 - (y2 - y1) * 0.25;
+  const midY = (y1 + y2) / 2 + (x2 - x1) * 0.25;
+
+  mechCtx.beginPath();
+  mechCtx.moveTo(x1, y1);
+  mechCtx.quadraticCurveTo(midX, midY, x2, y2);
+  mechCtx.stroke();
+
+  // Arrowhead
+  const angle = Math.atan2(y2 - midY, x2 - midX);
+  mechCtx.beginPath();
+  mechCtx.moveTo(x2, y2);
+  mechCtx.lineTo(x2 - 8 * Math.cos(angle - 0.4), y2 - 8 * Math.sin(angle - 0.4));
+  mechCtx.lineTo(x2 - 8 * Math.cos(angle + 0.4), y2 - 8 * Math.sin(angle + 0.4));
+  mechCtx.closePath();
+  mechCtx.fill();
+  mechCtx.restore();
+}
+
+// Rendering Kinetics Plot
+function drawKineticsPlot() {
+  const w = kinCanvas.width;
+  const h = kinCanvas.height;
+  kinCtx.clearRect(0, 0, w, h);
+
+  const padLeft = 45;
+  const padRight = 20;
+  const padTop = 20;
+  const padBottom = 30;
+
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  // Axes
+  kinCtx.strokeStyle = "#475569";
+  kinCtx.lineWidth = 1;
+  kinCtx.beginPath();
+  kinCtx.moveTo(padLeft, padTop);
+  kinCtx.lineTo(padLeft, h - padBottom);
+  kinCtx.lineTo(w - padRight, h - padBottom);
+  kinCtx.stroke();
+
+  // Grid and Labels
+  kinCtx.fillStyle = "#94a3b8";
+  kinCtx.font = "10px sans-serif";
+  kinCtx.textAlign = "right";
+
+  // Y-axis ticks (Conc: 0 to C0)
+  for (let i = 0; i <= 4; i++) {
+    const val = (state.C0 * (i / 4)).toFixed(2);
+    const y = h - padBottom - (plotH * (i / 4));
+    kinCtx.fillText(val, padLeft - 6, y + 3);
+
+    kinCtx.strokeStyle = "#1e293b";
+    kinCtx.beginPath();
+    kinCtx.moveTo(padLeft, y);
+    kinCtx.lineTo(w - padRight, y);
+    kinCtx.stroke();
+  }
+
+  // Y title
+  kinCtx.save();
+  kinCtx.translate(14, h / 2);
+  kinCtx.rotate(-Math.PI / 2);
+  kinCtx.textAlign = "center";
+  kinCtx.fillText("Conc (mol/L)", 0, 0);
+  kinCtx.restore();
+
+  // X title
+  kinCtx.textAlign = "center";
+  kinCtx.fillText("Simulated Time (s)", padLeft + plotW / 2, h - 8);
+
+  if (state.history.length < 2) return;
+
+  const maxT = Math.max(state.history[state.history.length - 1].t, 1.0);
+
+  // Plot [C=O] curve
+  kinCtx.beginPath();
+  kinCtx.strokeStyle = "#38bdf8";
+  kinCtx.lineWidth = 2;
+  state.history.forEach((pt, idx) => {
+    const x = padLeft + (pt.t / maxT) * plotW;
+    const y = h - padBottom - (pt.c / state.C0) * plotH;
+    if (idx === 0) kinCtx.moveTo(x, y);
+    else kinCtx.lineTo(x, y);
+  });
+  kinCtx.stroke();
+
+  // Plot [Cyanohydrin] curve
+  kinCtx.beginPath();
+  kinCtx.strokeStyle = "#10b981";
+  kinCtx.lineWidth = 2;
+  state.history.forEach((pt, idx) => {
+    const x = padLeft + (pt.t / maxT) * plotW;
+    const y = h - padBottom - (pt.p / state.C0) * plotH;
+    if (idx === 0) kinCtx.moveTo(x, y);
+    else kinCtx.lineTo(x, y);
+  });
+  kinCtx.stroke();
+
+  // Legend
+  kinCtx.font = "11px sans-serif";
+  kinCtx.fillStyle = "#38bdf8";
+  kinCtx.fillText("— [Carbonyl C=O]", w - 160, padTop + 12);
+  kinCtx.fillStyle = "#10b981";
+  kinCtx.fillText("— [Cyanohydrin]", w - 70, padTop + 12);
+}
+
+// Update Numeric Readouts
+function updateReadouts() {
+  const k = getK();
+  const cn = getCN();
+  const rate = getRate();
+  const conv = ((state.concP / state.C0) * 100).toFixed(1);
+
+  readoutK.textContent = k >= 1000 ? k.toExponential(2) : k.toFixed(2);
+  readoutCN.textContent = cn < 0.001 ? cn.toExponential(2) : cn.toFixed(4) + " M";
+  readoutRate.textContent = rate < 0.001 && rate > 0 ? rate.toExponential(2) : rate.toFixed(4) + " M/s";
+  readoutC.textContent = state.concC.toFixed(3) + " M";
+  readoutP.textContent = state.concP.toFixed(3) + " M";
+  readoutConv.textContent = conv + " %";
+}
+
+// Interactive Questions setup
+const questionsData = [
+  {
+    id: "q1",
+    correct: "Attack of CN- on carbonyl carbon",
+    expl: "Correct! The attack of nucleophile (:CN⁻) on the electron-deficient carbonyl carbon is the slow, rate-determining step because it involves π-bond cleavage and transition to an unstable tetrahedral alkoxide intermediate. Protonation in Step 2 is very fast."
+  },
+  {
+    id: "q2",
+    correct: "It raises [CN-] from weakly ionised HCN",
+    expl: "Correct! HCN is a very weak acid (Ka = 6.2 × 10⁻¹⁰) and produces very few CN⁻ ions on its own. A base deprotonates HCN to generate a high concentration of the active nucleophile CN⁻, accelerating the reaction."
+  },
+  {
+    id: "q3",
+    correct: "Two alkyl groups add steric hindrance and reduce the δ+ on C",
+    expl: "Correct! In propanone (ketone), two bulky methyl groups sterically crowd the approach of CN⁻ (steric hindrance) and their electron-donating (+I) inductive effect reduces the partial positive charge (δ+) on the carbonyl carbon (electronic effect)."
+  }
+];
+
+questionsData.forEach((qObj) => {
+  const container = document.getElementById(qObj.id);
+  const buttons = container.querySelectorAll(".qa-option-btn");
+  const explBox = container.querySelector(".qa-explanation");
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const selected = btn.dataset.ans;
+      if (selected === qObj.correct) {
+        btn.style.background = "#065f46";
+        btn.style.borderColor = "#10b981";
+        explBox.style.display = "block";
+        explBox.style.background = "#064e3b";
+        explBox.style.color = "#a7f3d0";
+        explBox.textContent = "✓ " + qObj.expl;
+      } else {
+        btn.style.background = "#7f1d1d";
+        btn.style.borderColor = "#ef4444";
+        explBox.style.display = "block";
+        explBox.style.background = "#450a0a";
+        explBox.style.color = "#fecaca";
+        explBox.textContent = "✗ Incorrect. Try again or consider which step involves forming the key tetrahedral intermediate.";
+      }
+    });
+  });
+});
+
+// Main Loop
+function mainLoop() {
+  updatePhysics();
+  drawMechanism();
+  drawKineticsPlot();
+  updateReadouts();
+  requestAnimationFrame(mainLoop);
+}
+
+// Initialize
+resetSim();
+requestAnimationFrame(mainLoop);
+</script>
+</body>
+</html>

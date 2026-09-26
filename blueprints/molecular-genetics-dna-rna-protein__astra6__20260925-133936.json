@@ -1,0 +1,116 @@
+{
+  "topic": "Molecular Genetics DNA → RNA → protein",
+  "grade": 12,
+  "teacher": "astra6",
+  "model": "astra6:openai/gpt-6-astra",
+  "rag": false,
+  "created": "2026-09-25 13:39",
+  "cost_usd": 0.09483,
+  "in_tokens": 453,
+  "out_tokens": 1806,
+  "seconds": 49.78,
+  "plan": {
+    "title": "DNA → RNA → Protein: Reading a Gene",
+    "grade": 12,
+    "subject": "Biology",
+    "ncert_refs": [
+      "NCERT Class 12 Biology, Molecular Basis of Inheritance: Transcription.",
+      "NCERT Class 12 Biology, Molecular Basis of Inheritance: Genetic Code and Translation."
+    ],
+    "learning_objectives": [
+      "Relate template DNA, coding DNA and complementary RNA sequences.",
+      "Track transcription and translation using constant-speed kinetic equations.",
+      "Explain the reading frame, initiation codon and termination codon."
+    ],
+    "physics": {
+      "equations": [
+        "Coding DNA: 5′-ATG GCT TTT GAA CCG TAA-3′.",
+        "Template DNA: 3′-TAC CGA AAA CTT GGC ATT-5′.",
+        "mRNA: 5′-AUG GCU UUU GAA CCG UAA-3′.",
+        "Protein sequence: Met–Ala–Phe–Glu–Pro; UAA specifies termination.",
+        "L = 18 nt; C = 6 codons; T_tx = L/v_tx; T_end = T_tx + C/v_r.",
+        "x(t) = min(L, v_tx t); N_RNA = floor(x).",
+        "y(t) = min(C, max(0, v_r(t − T_tx))); N_aa = min(5, floor(y)).",
+        "RNA synthesis uses template pairing A→U, T→A, G→C and C→G."
+      ],
+      "parameters": [
+        {
+          "name": "RNA polymerase elongation speed",
+          "symbol": "v_tx",
+          "unit": "nt/s",
+          "min": 10,
+          "max": 80,
+          "default": 40
+        },
+        {
+          "name": "Ribosome codon-processing speed",
+          "symbol": "v_r",
+          "unit": "codons/s",
+          "min": 1,
+          "max": 20,
+          "default": 10
+        }
+      ],
+      "state_update": "Initialize t=0; each animation frame set Δt_real=(timestamp−previous_timestamp)/1000 s and t=min(T_end,t+0.1Δt_real), then recompute x, y, N_RNA and N_aa from the equations; use floor(value+1e−9) with counts capped at their stated maxima; begin translation only at t≥T_tx, release the peptide at y=6 and freeze at T_end; reset t and the timestamp baseline after Restart or either slider change.",
+      "model_note": ""
+    },
+    "visualization": "Build one offline HTML file using inline CSS, JavaScript and canvas with zero network requests; show aligned coding and template DNA above a growing RNA strand and a lower translation track; place polymerase at fractional nucleotide position x and ribosome at fractional codon position y; reveal only completed RNA nucleotides and append amino acids at completed sense-codon steps; highlight AUG, separate triplets and mark UAA as STOP without adding an amino acid; label strand ends and show RNA synthesis 5′→3′; use a short intron-free coding fragment with regulatory regions omitted; print equations and a 0.1× playback label beside the canvas.",
+    "controls": [
+      "RNA polymerase speed slider: 10–80 nt/s, step 1, default 40.",
+      "Ribosome codon-processing speed slider: 1–20 codons/s, step 1, default 10.",
+      "Restart button: return simulated time to 0 s."
+    ],
+    "readouts": [
+      "Simulated time t in s, to two decimals.",
+      "Completed RNA nucleotides N_RNA out of 18 nt.",
+      "Peptide length N_aa out of 5 amino acids.",
+      "Transcription duration T_tx and total duration T_end in s, to two decimals.",
+      "Stage: transcription, translation or peptide released."
+    ],
+    "observations": [
+      "Increasing polymerase speed shortens transcription without changing RNA sequence.",
+      "Increasing ribosome speed shortens translation without changing protein sequence.",
+      "RNA matches the coding strand except that U replaces T.",
+      "Six codons produce five amino acids because the final codon is a stop signal.",
+      "Translation follows completed transcription here for clarity; bacterial transcription and translation can overlap."
+    ],
+    "questions": [
+      {
+        "q": "Which RNA codon corresponds to template DNA 3′-TAC-5′?",
+        "options": [
+          "5′-AUG-3′",
+          "5′-UAC-3′",
+          "5′-ATG-3′"
+        ],
+        "answer": "5′-AUG-3′",
+        "explanation": "RNA is complementary and antiparallel to the template strand."
+      },
+      {
+        "q": "What happens if polymerase speed doubles?",
+        "options": [
+          "Transcription time halves",
+          "RNA length doubles",
+          "Protein sequence changes"
+        ],
+        "answer": "Transcription time halves",
+        "explanation": "For fixed length, T_tx=L/v_tx."
+      },
+      {
+        "q": "How many amino acids does this sequence specify?",
+        "options": [
+          "5",
+          "6",
+          "18"
+        ],
+        "answer": "5",
+        "explanation": "AUG and four following sense codons specify amino acids, while UAA signals termination."
+      }
+    ],
+    "misconceptions": [
+      "The coding strand is not the strand used as the transcription template.",
+      "RNA polymerase does not replace DNA with RNA.",
+      "A stop codon does not specify an amino acid."
+    ],
+    "grade_language_notes": "Use NCERT terminology and constant-speed equations; disclose uniform codon dwell including simplified stop recognition, omitted initiation delays and RNA processing, and a generic Met-labelled initiation residue; provide a What to observe panel and individual click-to-reveal question answers."
+  }
+}

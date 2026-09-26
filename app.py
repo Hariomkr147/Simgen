@@ -1,0 +1,683 @@
+"""Local test UI for the simgen pipeline. Run: python app.py
+Then open http://127.0.0.1:5050
+
+ponytail: Flask (one dep), sync request/response — a 30-180s LLM call is fine
+blocking, no JS needed for the "loading" state (the browser's own spinner
+covers it). Library is a filesystem scan (runs/*/*.html), not a database —
+the files are already the source of truth; a sidecar JSONL only adds the
+cost/model metadata scans can't recover.
+"""
+import html
+import json
+import os
+import shutil
+import time
+from pathlib import Path
+from urllib.parse import urlencode
+
+from flask import Flask, Response, request
+
+from simgen import pipeline
+from simgen.__main__ import load_env, slug
+
+load_env()
+app = Flask(__name__)
+RUNS = Path("runs")
+LOG = RUNS / "library.jsonl"
+BEST_DIR = Path("Best Sim")   # "Save best" button copies chosen sims here
+
+MODE_LABEL = {"teacher_only": "teacher only", "student_only": "student only",
+              "teacher_student": "teacher -> student", "blueprint": "blueprint only"}
+MODE_BADGE = {"teacher_only": "badge-t", "student_only": "badge-s", "teacher_student": "badge-ts",
+              "blueprint": "badge-t"}
+
+PAGE = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>simgen</title>
+<style>
+:root{
+  --bg:#f6f4ee; --surface:#ffffff; --surface-2:#efebe0; --ink:#1f2420; --ink-dim:#656e64;
+  --border:#ddd6c4; --accent:#2f6f66; --accent-ink:#ffffff;
+  --teacher:#a5690f; --student:#2f6f66; --hybrid:#5850c9;
+  --good:#2f7a4f; --bad:#b23b2e; --radius:12px;
+  --serif:ui-serif,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14181a; --surface:#1b2022; --surface-2:#222829; --ink:#eef1ec; --ink-dim:#98a19b;
+  --border:#2b3234; --accent:#5db8a8; --accent-ink:#0d1211;
+  --teacher:#d9a441; --student:#5db8a8; --hybrid:#9089ef;
+  --good:#4fbd7c; --bad:#e2685a; color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     padding:2.5rem 1rem 4rem;min-height:100vh}
+.wrap{max-width:980px;margin:0 auto}
+header{margin-bottom:2rem}
+header h1{font-family:var(--serif);font-size:2rem;font-weight:600;margin:0 0 .2rem;
+          letter-spacing:-.01em}
+header p{margin:0;color:var(--ink-dim);font-size:.95rem}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+       padding:1.5rem;margin-bottom:1.75rem}
+.panel h2{font-family:var(--serif);font-size:1.05rem;font-weight:600;margin:0 0 1rem}
+form{display:grid;gap:1rem}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:1rem}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+@media (max-width:640px){.row,.row3{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:.35rem}
+label{font-size:.78rem;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.04em}
+input,select{padding:.6rem .7rem;border-radius:8px;border:1px solid var(--border);
+             background:var(--bg);color:var(--ink);font:inherit;font-size:.92rem}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+fieldset{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:.5rem 1.25rem}
+fieldset label{text-transform:none;font-size:.88rem;color:var(--ink);display:flex;
+                align-items:center;gap:.4rem;letter-spacing:0}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.hint{font-size:.8rem;color:var(--ink-dim)}
+button{padding:.7rem 1.4rem;border-radius:8px;border:0;background:var(--accent);
+       color:var(--accent-ink);font-weight:600;font-size:.92rem;cursor:pointer}
+button:hover{opacity:.9}
+.buttons{display:flex;gap:.6rem;flex-wrap:wrap}
+.badge{display:inline-block;padding:.15rem .55rem;border-radius:99px;font-size:.72rem;
+       font-weight:600;letter-spacing:.02em;color:#fff}
+.badge-t{background:var(--teacher)}.badge-s{background:var(--student)}.badge-ts{background:var(--hybrid)}
+.stat{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+      margin-bottom:1.25rem;overflow:hidden}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+           padding:.85rem 1.1rem;background:var(--surface-2);flex-wrap:wrap}
+.card-head .stats{display:flex;gap:1rem;font-size:.85rem;color:var(--ink-dim)}
+.checks-ok{color:var(--good);font-weight:600}.checks-bad{color:var(--bad);font-weight:600}
+.err{padding:1rem 1.1rem;color:var(--bad);font-size:.9rem}
+iframe{width:100%;height:620px;border:0;display:block;background:#fff}
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.9rem}
+.lib-card{display:block;background:var(--surface);border:1px solid var(--border);
+          border-radius:var(--radius);padding:.9rem 1rem}
+.lib-card:hover{border-color:var(--accent)}
+.lib-card-link{display:block;text-decoration:none;color:inherit}
+.save-best{display:inline-block;margin-top:.55rem;font-size:.75rem;color:var(--accent);
+           text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:.2rem .5rem}
+.save-best:hover{border-color:var(--accent)}
+.lib-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem}
+.lib-when{font-size:.72rem;color:var(--ink-dim)}
+.lib-card h4{margin:0 0 .4rem;font-family:var(--serif);font-size:.98rem;font-weight:600;
+             line-height:1.3}
+.lib-meta{font-size:.78rem;color:var(--ink-dim);display:flex;flex-wrap:wrap;justify-content:space-between;gap:.3rem}
+.lib-models{display:flex;flex-wrap:wrap;gap:.35rem;margin:0 0 .5rem}
+.model-tag{font-family:var(--mono);font-size:.7rem;background:var(--surface-2);
+           border:1px solid var(--border);border-radius:6px;padding:.1rem .4rem;cursor:help}
+.empty{color:var(--ink-dim);font-size:.9rem}
+.split{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;padding:.6rem 1.1rem;font-size:.82rem;
+       color:var(--ink-dim);border-top:1px solid var(--border)}
+.split b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.bp-body{padding:.9rem 1.1rem;font-size:.86rem;line-height:1.5}
+.bp-body code{font-family:var(--mono);font-size:.8rem;background:var(--surface-2);
+              padding:.05rem .35rem;border-radius:4px}
+.tbl-wrap{overflow-x:auto}
+table.bp{width:100%;border-collapse:collapse;font-size:.84rem}
+table.bp th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;
+            color:var(--ink-dim);font-weight:600;padding:.4rem .5rem;border-bottom:1px solid var(--border)}
+table.bp td{padding:.55rem .5rem;border-bottom:1px solid var(--border);vertical-align:top}
+table.bp td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.bp a{color:var(--accent)}
+.pill{font-size:.7rem;padding:.05rem .45rem;border-radius:99px;border:1px solid var(--border);
+      color:var(--ink-dim);white-space:nowrap}
+</style></head><body><div class="wrap">
+<header>
+  <h1>simgen</h1>
+  <p>NCERT topic → interactive simulation. Teacher plans, student builds, every run priced in &#8377; (1 USD = &#8377;@@RATE@@). <a href="/costs" style="color:var(--accent);font-weight:600">Cost table &rarr;</a></p>
+</header>
+
+<div class="panel">
+  <h2>Generate</h2>
+  <form method="post" action="/run">
+    <div class="row">
+      <div class="field"><label for="topic">Class topic</label>
+        <input id="topic" name="topic" list="bp-topics" value="@@TOPIC@@" placeholder="Class 9 Science: Simple Pendulum" required>
+        <datalist id="bp-topics">@@BP_OPTIONS@@</datalist></div>
+      <div class="field"><label for="grade">Grade</label>
+        <input id="grade" name="grade" type="number" min="1" max="12" value="@@GRADE@@"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label for="teacher">Teacher model</label>
+        <select id="teacher" name="teacher">@@TEACHER_OPTS@@</select></div>
+      <div class="field"><label for="student">Student model</label>
+        <select id="student" name="student">@@STUDENT_OPTS@@</select></div>
+      <div class="field"><label>&nbsp;</label>
+        <label style="text-transform:none;display:flex;align-items:center;gap:.4rem;padding-top:.4rem">
+          <input type="checkbox" name="rag" @@RAG@@ style="width:auto"> ground with NCERT (RAG)</label>
+        <label style="text-transform:none;display:flex;align-items:center;gap:.4rem">
+          <input type="checkbox" name="reuse" @@REUSE@@ style="width:auto"> reuse stored blueprint</label></div>
+    </div>
+    <div class="actions">
+      <fieldset>
+        <label><input type="checkbox" name="modes" value="teacher_only" @@M_TO@@> teacher_only</label>
+        <label><input type="checkbox" name="modes" value="student_only" @@M_SO@@> student_only</label>
+        <label><input type="checkbox" name="modes" value="teacher_student" @@M_TS@@> teacher_student</label>
+        <label><input type="checkbox" name="modes" value="blueprint" @@M_BP@@> blueprint only</label>
+      </fieldset>
+      <div class="buttons">
+        <button type="submit">Generate</button>
+      </div>
+    </div>
+    <p class="hint">A run blocks for as long as the real model call takes — usually 30s to 2 minutes per mode.</p>
+  </form>
+</div>
+
+@@RESULTS@@
+
+<div class="panel">
+  <h2>Blueprints <span class="hint">— @@BP_COUNT@@ stored · teacher_student reuses these, so only the student build is paid</span></h2>
+  @@BLUEPRINTS@@
+</div>
+
+<div class="panel">
+  <h2>Library <span class="hint">— @@LIB_COUNT@@ generated</span></h2>
+  @@LIBRARY@@
+</div>
+</div></body></html>"""
+
+
+def model_options(kind, selected):
+    """Dropdown aliases: TEACHER_MODELS / STUDENT_MODELS in .env (comma list), else every
+    MODEL_<alias>_ID that isn't a :batch variant. Compared case-insensitively because
+    Windows upper-cases os.environ keys."""
+    listed = [a.strip() for a in os.getenv(f"{kind.upper()}_MODELS", "").split(",") if a.strip()]
+    aliases = listed or sorted(k[len("MODEL_"):-len("_ID")] for k in os.environ
+                               if k.startswith("MODEL_") and k.endswith("_ID") and "batch" not in k.lower())
+    opts = []
+    for a in aliases:
+        sel = " selected" if a.lower() == (selected or "").lower() else ""
+        opts.append(f'<option value="{html.escape(a)}"{sel}>{html.escape(a)}</option>')
+    return "".join(opts)
+
+
+def model_tags(models):
+    """[{role, model, in_tokens, out_tokens, cached_tokens, cost_source}, ...] -> compact
+    tags naming which model actually generated the output, with tokens/cache on hover."""
+    role_short = {"teacher": "T", "student": "S", "judge": "J"}
+    tags = []
+    for m in models or []:
+        alias, _, mid = str(m.get("model", "")).partition(":")
+        role = role_short.get(m.get("role"), (m.get("role") or "?")[:1].upper())
+        tip = f"{mid or alias} - {m.get('in_tokens', 0)}->{m.get('out_tokens', 0)} tok"
+        if m.get("cached_tokens"):
+            tip += f" ({m['cached_tokens']} cached)"
+        if m.get("cost_source") == "table":
+            tip += " - estimated price"
+        tags.append(f'<span class="model-tag" title="{html.escape(tip)}">{role}-{html.escape(alias)}</span>')
+    return "".join(tags)
+
+
+def confidence_badge(pct, verdict=None):
+    """Judge's 0-100 confidence-of-correctness score as a small colored badge."""
+    if pct is None:
+        return '<span class="hint">not judged</span>'
+    cls = "checks-ok" if pct >= 70 else "checks-bad"
+    tip = f' title="{html.escape(verdict)}"' if verdict else ""
+    return f'<span class="{cls}"{tip}>{pct}% confidence</span>'
+
+
+USD_INR = float(os.getenv("USD_INR", "95.6"))  # OpenRouter bills USD; UI shows INR
+
+
+def money(usd):
+    """USD cost -> INR string. &#8377; (the rupee sign) keeps the source pure ASCII."""
+    return f"&#8377;{usd * USD_INR:,.2f}" if usd is not None else "-"
+
+
+def blueprint_items():
+    """Every stored blueprint (all topics, all teachers, all versions), newest first."""
+    recs = []
+    for p in pipeline.blueprint_files():
+        try:
+            recs.append(pipeline.read_blueprint(p))
+        except (OSError, json.JSONDecodeError):
+            continue
+    return recs
+
+
+def render_blueprints(recs):
+    if not recs:
+        return '<p class="empty">No stored blueprints yet — tick "blueprint only" above, or run make_blueprints.py.</p>'
+    rows = []
+    for r in recs:
+        q = urlencode({"topic": r["topic"], "grade": r.get("grade") or "", "teacher": r.get("teacher") or ""})
+        alias, _, mid = str(r.get("model", r.get("teacher", ""))).partition(":")
+        rows.append(f"""<tr>
+          <td><a href="/?{html.escape(q)}" title="load into the form above">{html.escape(r['topic'])}</a></td>
+          <td class="num">{r.get('grade') or '—'}</td>
+          <td><span class="model-tag" title="{html.escape(mid or alias)}">T-{html.escape(alias)}</span></td>
+          <td class="num">{money(r.get('cost_usd'))}</td>
+          <td class="num">{r.get('in_tokens', 0)}&rarr;{r.get('out_tokens', 0)}</td>
+          <td><span class="pill">{'NCERT-grounded' if r.get('rag') else 'ungrounded'}</span></td>
+          <td class="num">{html.escape(r.get('created', ''))}</td>
+          <td><a href="/blueprint/{html.escape(r['file'])}" target="_blank">JSON</a></td>
+        </tr>""")
+    total = sum(r.get("cost_usd") or 0 for r in recs)
+    return f"""<div class="tbl-wrap"><table class="bp">
+      <tr><th>Topic</th><th>Grade</th><th>Teacher</th><th>Cost</th><th>Tokens in&rarr;out</th>
+          <th>Grounding</th><th>Created</th><th></th></tr>
+      {''.join(rows)}</table></div>
+      <p class="hint">Total spent on stored blueprints: <span class="stat">{money(total)}</span>.
+      Every blueprint is kept (one file per generation). Click a topic to load it with its teacher;
+      teacher_student then reuses that teacher's newest blueprint and only pays for the student.</p>"""
+
+
+def cost_split(rec, fresh, student_cost, judge_cost=0):
+    """Blueprint vs student-build (vs judge) cost line for a teacher_student result."""
+    bp = rec.get("cost_usd") or 0
+    how = "generated now" if fresh else f"stored, reused (made {html.escape(rec.get('created', ''))})"
+    this_run = student_cost + judge_cost + (bp if fresh else 0)
+    judge_part = f'<span>Judge <b>{money(judge_cost)}</b></span>' if judge_cost else ""
+    return (f'<div class="split"><span>Blueprint <b>{money(bp)}</b> · {how}</span>'
+            f'<span>Student build <b>{money(student_cost)}</b></span>{judge_part}'
+            f'<span>This run <b>{money(this_run)}</b></span></div>')
+
+
+def log_run(entry):
+    RUNS.mkdir(parents=True, exist_ok=True)
+    with open(LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def load_meta():
+    """slug -> {file stem: logged entry}. Older entries have no "file" and their html was
+    saved as <mode>.html, so they key by mode."""
+    meta = {}
+    if LOG.exists():
+        for line in LOG.read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            meta.setdefault(e["slug"], {})[e.get("file", e["mode"])] = e
+    return meta
+
+
+def save_best_link(run_slug, name, text="save best"):
+    return (f'<a class="save-best" href="/save-best/{run_slug}/{name}" target="_blank" '
+            f'title="Copy this file into the Best Sim folder">&#128190; {text}</a>')
+
+
+def library_items(limit=60):
+    """Every generated simulation on disk, newest first — filesystem is the source
+    of truth (also picks up CLI runs), library.jsonl only adds cost/model metadata."""
+    if not RUNS.exists():
+        return []
+    files = sorted(RUNS.glob("*/*.html"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+    meta = load_meta()
+    items = []
+    for f in files:
+        run_slug, name = f.parent.name, f.stem
+        e = meta.get(run_slug, {}).get(name, {})
+        items.append({
+            "slug": run_slug, "name": name, "mode": name.split("__")[0],
+            "topic": e.get("topic") or run_slug.replace("-", " ").title(),
+            "teacher": e.get("teacher"), "student": e.get("student"),
+            "grade": e.get("grade"), "models": e.get("models"),
+            "cost": e.get("cost_usd"), "passed": e.get("checks_passed"),
+            "bp_cost": e.get("blueprint_cost_usd"), "student_cost": e.get("student_cost_usd"),
+            "total": e.get("checks_total"), "mtime": f.stat().st_mtime,
+            "confidence": e.get("confidence_pct"), "verdict": (e.get("judge") or {}).get("verdict"),
+        })
+    return items
+
+
+def render_library():
+    items = library_items()
+    if not items:
+        return '<p class="empty">No simulations generated yet — run one above.</p>', 0
+    cards = []
+    for it in items:
+        cost = money(it["cost"])
+        checks = f"{it['passed']}/{it['total']}" if it["passed"] is not None else "—"
+        when = time.strftime("%b %d, %H:%M", time.localtime(it["mtime"]))
+        badge = MODE_BADGE.get(it["mode"], "")
+        # models[] (per-call actuals) if logged; else fall back to the picked teacher/student.
+        tags = model_tags(it["models"]) or model_tags(
+            ([{"role": "teacher", "model": it["teacher"]}] if it["teacher"] and it["mode"] != "student_only" else []) +
+            ([{"role": "student", "model": it["student"]}] if it["student"] and it["mode"] != "teacher_only" else []))
+        grade = f'<span class="lib-when">grade {it["grade"]}</span>' if it["grade"] else ""
+        split = (f"blueprint {money(it['bp_cost'])} + student build {money(it['student_cost'])}"
+                 if it["bp_cost"] is not None else "cost of this run")
+        cards.append(f'''<div class="lib-card">
+          <a class="lib-card-link" href="/view/{it['slug']}/{it['name']}" target="_blank">
+            <div class="lib-top"><span class="badge {badge}">{MODE_LABEL.get(it['mode'], it['mode'])}</span>
+              <span class="lib-when">{when}</span></div>
+            <h4>{html.escape(it['topic'])}</h4>
+            <div class="lib-models">{tags}{grade}</div>
+            <div class="lib-meta"><span class="stat" title="{split}">{cost}</span><span>{checks} checks</span>
+              {confidence_badge(it["confidence"], it["verdict"])}</div>
+          </a>
+          {save_best_link(it['slug'], it['name'])}
+        </div>''')
+    return f'<div class="lib-grid">{"".join(cards)}</div>', len(items)
+
+
+def render(topic="", grade="", teacher=None, student=None, modes=("teacher_student",),
+          rag=False, results="", reuse=True):
+    lib_html, lib_count = render_library()
+    bps = blueprint_items()
+    out = PAGE
+    for key, val in {
+        "@@TOPIC@@": html.escape(topic), "@@GRADE@@": html.escape(str(grade)),
+        "@@TEACHER_OPTS@@": model_options("teacher", teacher or os.environ["TEACHER"]),
+        "@@STUDENT_OPTS@@": model_options("student", student or os.environ["STUDENT"]),
+        "@@RAG@@": "checked" if rag else "",
+        "@@M_TO@@": "checked" if "teacher_only" in modes else "",
+        "@@M_SO@@": "checked" if "student_only" in modes else "",
+        "@@M_TS@@": "checked" if "teacher_student" in modes else "",
+        "@@M_BP@@": "checked" if "blueprint" in modes else "",
+        "@@REUSE@@": "checked" if reuse else "",
+        "@@BP_OPTIONS@@": "".join(f'<option value="{html.escape(r["topic"])}">' for r in bps),
+        "@@BLUEPRINTS@@": render_blueprints(bps), "@@BP_COUNT@@": str(len(bps)),
+        "@@RATE@@": f"{USD_INR:.2f}", "@@RESULTS@@": results, "@@LIBRARY@@": lib_html, "@@LIB_COUNT@@": str(lib_count),
+    }.items():
+        out = out.replace(key, val)
+    return out
+
+
+@app.get("/")
+def home():
+    return render(request.args.get("topic", ""), request.args.get("grade", ""),
+                  request.args.get("teacher") or None)
+
+
+@app.post("/run")
+def run():
+    topic = request.form["topic"].strip()
+    grade = request.form.get("grade") or ""
+    teacher = request.form.get("teacher") or os.environ["TEACHER"]
+    student = request.form.get("student") or os.environ["STUDENT"]
+    modes = request.form.getlist("modes") or ["teacher_student"]
+    use_rag = bool(request.form.get("rag"))
+    reuse = bool(request.form.get("reuse"))
+    run_slug = slug(topic)
+    g = int(grade) if grade else None
+
+    cards = []
+    for mode in modes:
+        if mode == "blueprint":
+            try:
+                rec, usages = pipeline.blueprint(topic, g, teacher, use_rag, force=not reuse)
+            except Exception as e:
+                cards.append(f'<div class="card"><div class="card-head"><span class="badge badge-t">blueprint only</span>'
+                             f'</div><div class="err">{html.escape(str(e))}</div></div>')
+                continue
+            cards.append(render_blueprint_card(rec, bool(usages)))
+            continue
+        try:
+            out_html, plan, usages = pipeline.run(
+                mode, topic, g, teacher, student, use_rag=use_rag, reuse_blueprint=reuse)
+        except Exception as e:
+            cards.append(f'<div class="card"><div class="card-head"><span class="badge {MODE_BADGE.get(mode,"")}">'
+                         f'{MODE_LABEL.get(mode, mode)}</span></div><div class="err">{html.escape(str(e))}</div></div>')
+            continue
+
+        # one file per generation: a second model on the same topic never replaces the first
+        name = pipeline.write_new(RUNS / run_slug, pipeline.run_name(mode, teacher, student),
+                                  ".html", out_html).stem
+        cost = sum(u.cost_usd for u in usages)
+        secs = sum(u.seconds for u in usages)
+        checks = pipeline.static_checks(out_html)
+        passed, total = sum(checks.values()), len(checks)
+        models = [{"role": u.role, "model": u.model, "in_tokens": u.in_tokens, "out_tokens": u.out_tokens,
+                   "cached_tokens": u.cached_tokens, "cost_source": u.cost_source,
+                   "cost_usd": u.cost_usd, "seconds": u.seconds} for u in usages]
+
+        # Grade every generation with the JUDGE model (an LLM examiner, not a human) and
+        # surface its rubric total as a 0-100 confidence-of-correctness label. Best-effort:
+        # a judging failure (bad JSON, timeout) never breaks the generation itself.
+        # JUDGE_ENABLED=false (the default) skips this entirely -- it's an extra paid call
+        # on every generation, and Opus 5 judging got expensive fast. Flip it back on in .env.
+        scores, judge_cost = None, 0
+        if os.environ.get("JUDGE_ENABLED", "false").lower() in ("1", "true", "yes"):
+            try:
+                scores, ju = pipeline.judge(out_html, topic, g, os.environ.get("JUDGE", "opus5"))
+                models.append({"role": "judge", "model": ju.model, "in_tokens": ju.in_tokens,
+                               "out_tokens": ju.out_tokens, "cached_tokens": ju.cached_tokens,
+                               "cost_source": ju.cost_source, "cost_usd": ju.cost_usd, "seconds": ju.seconds})
+                cost += ju.cost_usd
+                secs += ju.seconds
+                judge_cost = ju.cost_usd
+            except Exception:
+                pass
+        confidence = pipeline.confidence_pct(scores)
+
+        split, extra = "", {}
+        if mode == "teacher_student":
+            rec = pipeline.load_blueprint(topic, teacher) or {}  # the one run() just used
+            fresh = any(u.role == "teacher" for u in usages)
+            student_cost = sum(u.cost_usd for u in usages if u.role == "student")
+            if not fresh:  # still name the teacher that wrote the stored blueprint
+                models.insert(0, {"role": "teacher", "model": rec.get("model", rec.get("teacher", "?")),
+                                  "in_tokens": rec.get("in_tokens", 0), "out_tokens": rec.get("out_tokens", 0),
+                                  "cost_usd": rec.get("cost_usd"), "seconds": rec.get("seconds"),
+                                  "cost_source": "stored blueprint"})
+            split = cost_split(rec, fresh, student_cost, judge_cost)
+            extra = {"blueprint_cost_usd": rec.get("cost_usd"), "blueprint_reused": not fresh,
+                     "blueprint_file": rec.get("file"),
+                     "student_cost_usd": student_cost}
+        log_run({"ts": time.time(), "slug": run_slug, "mode": mode, "topic": topic,
+                 "grade": g, "teacher": teacher, "student": student,
+                 "cost_usd": cost, "seconds": secs, "checks_passed": passed, "checks_total": total,
+                 "models": models, "rag": use_rag, "file": name,
+                 "confidence_pct": confidence, "judge": scores, **extra})
+        badge = MODE_BADGE.get(mode, "")
+        checks_cls = "checks-ok" if passed == total else "checks-bad"
+        cards.append(f'''<div class="card">
+          <div class="card-head">
+            <span class="badge {badge}">{MODE_LABEL.get(mode, mode)}</span>
+            <div class="lib-models">{model_tags(models)}</div>
+            <div class="stats">
+              <span class="stat">{money(cost)}</span><span class="stat">{secs:.1f}s</span>
+              <span class="{checks_cls}">{passed}/{total} checks</span>
+              {confidence_badge(confidence, (scores or {}).get("verdict"))}
+            </div>
+          </div>
+          {split}
+          <iframe src="/sim/{run_slug}/{name}"></iframe>
+          <div class="split"><a href="/view/{run_slug}/{name}" target="_blank">open with full details</a></div>
+        </div>''')
+
+    return render(topic, grade, teacher, student, modes, use_rag, "\n".join(cards), reuse)
+
+
+def render_blueprint_card(rec, fresh):
+    plan = rec.get("plan", {})
+    eqs = (plan.get("physics") or {}).get("equations") or []
+    params = (plan.get("physics") or {}).get("parameters") or []
+    alias = str(rec.get("model", rec.get("teacher", ""))).partition(":")[0]
+    return f'''<div class="card">
+      <div class="card-head">
+        <span class="badge badge-t">blueprint only</span>
+        <div class="lib-models"><span class="model-tag">T-{html.escape(alias)}</span>
+          <span class="pill">{"generated now" if fresh else "already stored — not regenerated"}</span></div>
+        <div class="stats"><span class="stat">{money(rec.get("cost_usd"))}</span>
+          <span class="stat">{rec.get("in_tokens", 0)}&rarr;{rec.get("out_tokens", 0)} tok</span>
+          <span class="stat">{rec.get("seconds", 0)}s</span></div>
+      </div>
+      <div class="bp-body"><b>{html.escape(str(plan.get("title", rec.get("topic", ""))))}</b><br>
+        {" ".join(f"<code>{html.escape(str(e))}</code>" for e in eqs[:4])}<br>
+        <span class="hint">{len(params)} parameters · {len(plan.get("questions") or [])} questions ·
+        {"NCERT-grounded" if rec.get("rag") else "ungrounded"} ·
+        <a href="/blueprint/{html.escape(rec.get("file", ""))}" target="_blank">full JSON</a></span></div>
+    </div>'''
+
+
+@app.get("/blueprint/<name>")
+def blueprint_json(name):
+    f = pipeline.BLUEPRINTS / f"{name}.json"
+    if not pipeline.SAFE_NAME.fullmatch(name) or not f.exists():   # no ..\ path tricks
+        return "not found", 404
+    return Response(f.read_text(encoding="utf-8"), mimetype="application/json")
+
+
+@app.get("/save-best/<run_slug>/<name>")
+def save_best(run_slug, name):
+    """Copy a library simulation into Best Sim/ next to the project, for keeping the ones
+    worth showing off separate from the full generated library."""
+    src = RUNS / run_slug / f"{name}.html"
+    if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not src.exists():
+        return "not found", 404
+    BEST_DIR.mkdir(exist_ok=True)
+    dest = BEST_DIR / f"{run_slug}__{name}.html"
+    shutil.copy(src, dest)
+    return (f'<!doctype html><meta charset="utf-8"><body style="font:15px sans-serif;padding:2rem">'
+            f'Saved to <code>{html.escape(str(dest.resolve()))}</code>'
+            f'<script>setTimeout(()=>close(),1200)</script>')
+
+
+STYLE = PAGE[PAGE.index("<style>"):PAGE.index("</style>") + len("</style>")]
+ROLE = {"teacher": "Teacher", "student": "Student", "judge": "Judge"}
+
+
+def run_entry(run_slug, name):
+    """The library.jsonl entry for one generated file (older entries key by mode)."""
+    return load_meta().get(run_slug, {}).get(name, {})   # legacy <mode>.html: stem == mode == key
+
+
+def detail_row(k, v):
+    return f"<tr><th>{k}</th><td>{v}</td></tr>"
+
+
+@app.get("/view/<run_slug>/<name>")
+def view(run_slug, name):
+    """One generated simulation with everything known about how it was made."""
+    f = RUNS / run_slug / f"{name}.html"
+    if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not f.exists():
+        return "not found", 404
+    e = run_entry(run_slug, name) or {}
+    mode = name.split("__")[0]
+    checks = pipeline.static_checks(f.read_text(encoding="utf-8"))   # recomputed, no model call
+    passed = sum(checks.values())
+    made = time.strftime("%d %b %Y, %H:%M:%S", time.localtime(e.get("ts") or f.stat().st_mtime))
+    models = e.get("models") or []
+
+    calls = "".join(
+        f"""<tr><td>{ROLE.get(m.get('role'), html.escape(str(m.get('role'))))}</td>
+          <td><span class="model-tag">{html.escape(str(m.get('model', '')).partition(':')[0])}</span>
+              <span class="hint">{html.escape(str(m.get('model', '')).partition(':')[2])}</span></td>
+          <td class="num">{m.get('in_tokens', 0)}&rarr;{m.get('out_tokens', 0)}</td>
+          <td class="num">{f"{m['seconds']:.1f}s" if m.get('seconds') is not None else '-'}</td>
+          <td class="num">{money(m.get('cost_usd'))}</td>
+          <td>{'paid earlier (stored blueprint)' if m.get('cost_source') == 'stored blueprint'
+               else 'billed by OpenRouter' if m.get('cost_source') == 'reported'
+               else 'estimated from price table' if m.get('cost_source') == 'table' else '-'}</td></tr>"""
+        for m in models) or '<tr><td colspan="6" class="hint">Per-call details were not logged for this older run.</td></tr>'
+
+    bp_html = ""
+    if mode == "teacher_student":
+        bp_file = e.get("blueprint_file")
+        bpf = pipeline.BLUEPRINTS / f"{bp_file}.json" if bp_file else None
+        if bpf and bpf.exists():
+            rec = pipeline.read_blueprint(bpf)
+            plan = rec.get("plan", {})
+            eqs = (plan.get("physics") or {}).get("equations") or []
+            bp_html = f"""<div class="panel"><h2>Blueprint used</h2><div class="tbl-wrap"><table class="bp">
+              {detail_row("Title", html.escape(str(plan.get("title", ""))))}
+              {detail_row("Teacher", f'<span class="model-tag">T-{html.escape(str(rec.get("teacher")))}</span> <span class="hint">{html.escape(str(rec.get("model", "")).partition(":")[2])}</span>')}
+              {detail_row("Created", html.escape(rec.get("created", "")))}
+              {detail_row("Blueprint cost", f'{money(rec.get("cost_usd"))} <span class="hint">({rec.get("in_tokens", 0)}&rarr;{rec.get("out_tokens", 0)} tokens, {rec.get("seconds", 0)}s)</span>')}
+              {detail_row("This run", "reused a stored blueprint (not paid again)" if e.get("blueprint_reused") else "generated in this run")}
+              {detail_row("Grounding", "NCERT-grounded" if rec.get("rag") else "ungrounded")}
+              {detail_row("Equations", " ".join(f"<code>{html.escape(str(x))}</code>" for x in eqs) or "-")}
+              {detail_row("Questions", len(plan.get("questions") or []))}
+              {detail_row("File", f'<a href="/blueprint/{html.escape(rec["file"])}" target="_blank">{html.escape(rec["file"])}.json</a>')}
+            </table></div></div>"""
+        else:
+            bp_html = ('<div class="panel"><h2>Blueprint used</h2><p class="empty">Not recorded for this run '
+                       '(generated before blueprint tracking was added).</p></div>')
+
+    judge_scores = e.get("judge")
+    judge_cost = next((m.get("cost_usd") for m in models if m.get("role") == "judge"), None)
+
+    split = ""
+    if e.get("blueprint_cost_usd") is not None:
+        judge_part = f'<span>Judge <b>{money(judge_cost)}</b></span>' if judge_cost else ""
+        split = (f'<div class="split"><span>Blueprint <b>{money(e["blueprint_cost_usd"])}</b> · '
+                 f'{"stored, reused" if e.get("blueprint_reused") else "generated in this run"}</span>'
+                 f'<span>Student build <b>{money(e.get("student_cost_usd"))}</b></span>{judge_part}'
+                 f'<span>This run <b>{money(e.get("cost_usd"))}</b></span></div>')
+
+    judge_html = ""
+    if judge_scores:
+        axes = ("scientific_accuracy", "ncert_alignment", "interactivity",
+                "grade_appropriateness", "pedagogy")
+        judge_html = f"""<div class="panel"><h2>Judge assessment
+          <span class="hint">— an LLM examiner's read, not a human's</span></h2><div class="tbl-wrap"><table class="bp">
+          {detail_row("Confidence of correctness", confidence_badge(pipeline.confidence_pct(judge_scores)))}
+          {"".join(detail_row(a.replace("_", " ").capitalize(), f"{judge_scores.get(a, '-')}/5") for a in axes)}
+          {detail_row("Verdict", html.escape(str(judge_scores.get("verdict", "-"))))}
+        </table></div></div>"""
+    elif mode != "blueprint":
+        judge_html = '<div class="panel"><h2>Judge assessment</h2><p class="empty">Not judged for this run.</p></div>'
+
+    failed = [k for k, v in checks.items() if not v]
+    page = f"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>{html.escape(e.get("topic") or run_slug)}</title>
+{STYLE}</head><body><div class="wrap">
+<header><p><a href="/" style="color:var(--accent)">&larr; back to simgen</a></p>
+  <h1>{html.escape(e.get("topic") or run_slug.replace("-", " ").title())}</h1>
+  <p>{f"Grade {e['grade']} · " if e.get("grade") else ""}{made}</p></header>
+<div class="card">
+  <div class="card-head">
+    <span class="badge {MODE_BADGE.get(mode, "")}">{MODE_LABEL.get(mode, mode)}</span>
+    <div class="lib-models">{model_tags(models)}</div>
+    <div class="stats"><span class="stat">{money(e.get("cost_usd"))}</span>
+      <span class="stat">{f"{e['seconds']:.1f}s" if e.get("seconds") is not None else "-"}</span>
+      <span class="{"checks-ok" if not failed else "checks-bad"}">{passed}/{len(checks)} checks</span>
+      {confidence_badge(pipeline.confidence_pct(judge_scores), (judge_scores or {}).get("verdict"))}</div>
+  </div>
+  {split}
+  <iframe src="/sim/{run_slug}/{name}" style="height:78vh"></iframe>
+  <div class="split"><a href="/sim/{run_slug}/{name}" target="_blank">open simulation alone</a>
+    {save_best_link(run_slug, name, "save to Best Sim")}</div>
+</div>
+<div class="panel"><h2>Model calls</h2><div class="tbl-wrap"><table class="bp">
+  <tr><th>Role</th><th>Model</th><th>Tokens in&rarr;out</th><th>Time</th><th>Cost</th><th>Billing</th></tr>
+  {calls}</table></div></div>
+{judge_html}
+{bp_html}
+<div class="panel"><h2>Run details</h2><div class="tbl-wrap"><table class="bp">
+  {detail_row("Generated", made)}
+  {detail_row("Mode", MODE_LABEL.get(mode, mode))}
+  {detail_row("Teacher picked", html.escape(str(e.get("teacher") or "-")))}
+  {detail_row("Student picked", html.escape(str(e.get("student") or "-")))}
+  {detail_row("NCERT grounding (RAG)", "on" if e.get("rag") else "off" if e else "-")}
+  {detail_row("Total cost", f'{money(e.get("cost_usd"))} <span class="hint">(1 USD = &#8377;{USD_INR:.2f})</span>')}
+  {detail_row("Static checks", f'{passed}/{len(checks)}' + (f' <span class="hint">failed: {", ".join(failed)}</span>' if failed else ""))}
+  {detail_row("File", f"runs/{run_slug}/{html.escape(name)}.html")}
+</table></div></div>
+</div></body></html>"""
+    return page
+
+
+@app.get("/costs")
+def costs_page():
+    """Every teacher_student build by topic and blueprint, with working links to each simulation."""
+    import costs
+    head, body = costs.page(RUNS, pipeline.BLUEPRINTS, USD_INR)
+    return (f'<!doctype html><html><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width, initial-scale=1">{head}</head><body>{body}</body></html>')
+
+
+@app.get("/sim/<run_slug>/<name>")
+def sim(run_slug, name):
+    f = RUNS / run_slug / f"{name}.html"
+    if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not f.exists():
+        return "not found", 404
+    return Response(f.read_text(encoding="utf-8"), mimetype="text/html")
+
+
+if __name__ == "__main__":
+    # Render (and other PaaS) set PORT and expect a 0.0.0.0 bind; local dev keeps
+    # the old 127.0.0.1:5050 default. In production, gunicorn imports `app`
+    # directly (see Procfile) and this block never runs.
+    port = int(os.environ.get("PORT", 5050))
+    host = "0.0.0.0" if "PORT" in os.environ else "127.0.0.1"
+    print(f"simgen live UI: http://{host}:{port}")
+    app.run(host=host, port=port, debug=False, use_reloader=("PORT" not in os.environ))

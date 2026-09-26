@@ -1,0 +1,137 @@
+{
+  "topic": "covalent bonding in carbon compounds, structural isomers, homologous series.",
+  "grade": 10,
+  "teacher": "fable51",
+  "model": "fable51:anthropic/claude-fable-5.1",
+  "rag": false,
+  "created": "2026-09-24 14:00",
+  "cost_usd": 0.18502,
+  "in_tokens": 682,
+  "out_tokens": 3564,
+  "seconds": 46.09,
+  "plan": {
+    "title": "Carbon Chains: Covalent Bonds, Isomers and the Homologous Series",
+    "grade": 10,
+    "subject": "Science (Chemistry)",
+    "ncert_refs": [
+      "Class 10 Science, Chapter 4 Carbon and its Compounds, 4.1 Bonding in Carbon (covalent bond, electron dot structures)",
+      "Class 10 Science, Chapter 4, 4.2 Versatile Nature of Carbon (catenation, tetravalency, isomers, homologous series)"
+    ],
+    "learning_objectives": [
+      "Count shared electron pairs (covalent bonds) in a carbon compound and check every C has 4 bonds, every H has 1",
+      "Use general formulae CnH2n+2, CnH2n, CnH2n-2 to predict molecular formula and molar mass",
+      "State that successive homologues differ by one CH2 unit (14 u) and show gradual change in boiling point",
+      "Recognise structural isomers as different arrangements of the same molecular formula (C4H10, C5H12)"
+    ],
+    "physics": {
+      "equations": [
+        "H = 2n + 2 - 2k  (k = 0 alkane, 1 alkene, 2 alkyne)",
+        "Molar mass M = 12n + 1·H  (u)",
+        "ΔM between successive homologues = 14 u (one CH2)",
+        "Alkane bond count: C–C = n-1, C–H = 2n+2, total shared pairs = 3n+1",
+        "Valence electrons shared = 2 × (number of bonds); each C must show 4 bonds, each H 1 bond",
+        "Number of structural isomers of alkanes (lookup): n=1..10 → 1,1,1,2,3,5,9,18,35,75",
+        "Boiling point of straight-chain alkane (lookup, °C): n=1..10 → -162,-89,-42,-0.5,36,69,98,126,151,174"
+      ],
+      "parameters": [
+        {
+          "name": "Number of carbon atoms",
+          "symbol": "n",
+          "unit": "atoms",
+          "min": 1,
+          "max": 10,
+          "default": 4
+        },
+        {
+          "name": "Series type (0 alkane, 1 alkene, 2 alkyne)",
+          "symbol": "k",
+          "unit": "-",
+          "min": 0,
+          "max": 2,
+          "default": 0
+        },
+        {
+          "name": "Isomer index (alkanes only, n = 4 or 5)",
+          "symbol": "i",
+          "unit": "-",
+          "min": 1,
+          "max": 3,
+          "default": 1
+        },
+        {
+          "name": "Display mode (0 line structure, 1 electron dot)",
+          "symbol": "d",
+          "unit": "-",
+          "min": 0,
+          "max": 1,
+          "default": 0
+        }
+      ],
+      "state_update": "On any control change: if k>0 clamp n≥2 and i=1; H=2n+2-2k; M=12n+H; CC=n-1 single bonds (for k>0 one bond becomes double/triple); CH=H; bonds=CC+CH; sharedElectrons=2*bonds; isomers=lookup[n] (alkane) else '-'; bp=lookupBP[n] if k=0 else '-'; redraw canvas; each frame t+=1/60 and pulse dot-pair radius r=3+0.8·sin(2πt) px; when n increases, animate new CH2 unit sliding in over 0.5 s (x = x0 + (x1-x0)·min(1,τ/0.5))."
+    },
+    "visualization": "Canvas 800×420. Top: 2D structural formula of the molecule, C atoms as black circles in a horizontal chain (spacing 60 px), H atoms as small grey circles above/below/ends; bonds drawn as lines (single/double/triple) or, in dot mode, as pairs of pulsing red dots between atoms. Red highlight and 'valency error' text never appears because generator always satisfies C=4, H=1. For n=4 (i=1 butane, i=2 isobutane) and n=5 (i=1 pentane, i=2 isopentane, i=3 neopentane) draw branched layouts from hard-coded coordinates. Bottom strip: bar chart of molar mass M for n-1, n, n+1 with '+14 u' labels between bars, and a small boiling-point dot plot for alkanes 1–10 with current n highlighted.",
+    "controls": [
+      "Slider: number of carbon atoms n (1–10)",
+      "Buttons: Alkane (C–C) / Alkene (C=C) / Alkyne (C≡C)",
+      "Slider: isomer index i (enabled only for alkane with n=4 or 5)",
+      "Toggle button: Line structure / Electron dot structure"
+    ],
+    "readouts": [
+      "Molecular formula CnHH (e.g. C4H10) and IUPAC-style name (methane…decane; ethene…; ethyne…)",
+      "Molar mass M = 12n + H u, with difference from previous homologue (14 u)",
+      "Bond count: C–C bonds, C–H bonds, total covalent bonds, total shared electrons",
+      "Number of structural isomers for this alkane (lookup)",
+      "Boiling point of straight-chain alkane (°C) from lookup table",
+      "Printed equation: H = 2n+2-2k ; M = 12n + H ; bonds = 3n+1 (alkane)"
+    ],
+    "observations": [
+      "Every carbon always shows exactly 4 bonds and every hydrogen exactly 1 — count the dot pairs in electron-dot mode",
+      "Moving n up by 1 adds exactly one CH2 group: formula grows by CH2 and molar mass by 14 u every time",
+      "Boiling point rises gradually and smoothly with n — a gradation in physical properties along the series",
+      "For n=4 and n=5 the isomer slider changes the shape (branching) but not the formula C4H10 / C5H12",
+      "Switching to alkene or alkyne removes 2 H each time because a double or triple bond uses more of carbon's 4 valences"
+    ],
+    "questions": [
+      {
+        "q": "What is the molecular formula of the alkane with 7 carbon atoms?",
+        "options": [
+          "C7H14",
+          "C7H16",
+          "C7H12",
+          "C7H18"
+        ],
+        "answer": "C7H16",
+        "explanation": "Alkanes follow CnH2n+2; for n=7, H = 2×7+2 = 16."
+      },
+      {
+        "q": "How many covalent bonds (shared pairs) are there in one molecule of ethane, C2H6?",
+        "options": [
+          "6",
+          "7",
+          "8",
+          "14"
+        ],
+        "answer": "7",
+        "explanation": "One C–C bond plus six C–H bonds = 3n+1 = 7 shared pairs, i.e. 14 shared electrons."
+      },
+      {
+        "q": "Butane and 2-methylpropane (isobutane) both have formula C4H10. They are called:",
+        "options": [
+          "Homologues",
+          "Allotropes",
+          "Structural isomers",
+          "Ions"
+        ],
+        "answer": "Structural isomers",
+        "explanation": "Same molecular formula but different arrangement of atoms (straight vs branched chain)."
+      }
+    ],
+    "misconceptions": [
+      "Carbon forms ions (C4+ or C4-): it does not; it shares electrons because gaining or losing 4 electrons is energetically unfavourable",
+      "Isomers are the same compound drawn differently: propane's chain drawn bent is still propane; true isomers (n≥4) have different connectivity and different properties",
+      "Homologues differ by one atom: they differ by a whole CH2 unit, 14 u",
+      "A double bond means 'stronger, so more hydrogens': a double bond uses two valences, so alkenes have fewer H than alkanes"
+    ],
+    "grade_language_notes": "Use 'shared pair of electrons = one covalent bond', 'valency 4 of carbon', 'CH2 unit', 'gradation in properties'. Only arithmetic and substitution into general formulae; no hybridisation, orbitals, bond energies or 3-D geometry (tetrahedral angle) beyond a mention. Boiling points and isomer counts are given as tables, not derived."
+  }
+}

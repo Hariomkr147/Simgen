@@ -1,0 +1,141 @@
+{
+  "topic": "Projectile Motion",
+  "grade": null,
+  "teacher": "fable51",
+  "model": "fable51:anthropic/claude-fable-5.1",
+  "rag": false,
+  "created": "2026-09-24 10:51",
+  "cost_usd": 0.13602,
+  "in_tokens": 667,
+  "out_tokens": 2587,
+  "seconds": 34.05,
+  "plan": {
+    "title": "Projectile Motion: Launch Angle and Speed",
+    "grade": 11,
+    "subject": "Physics",
+    "ncert_refs": [
+      "NCERT Class 11 Physics Part 1, Chapter 3: Motion in a Plane, Section 3.7 Projectile Motion",
+      "Equations 3.36 to 3.42 (trajectory, time of flight, maximum height, horizontal range)"
+    ],
+    "learning_objectives": [
+      "Resolve initial velocity into horizontal and vertical components.",
+      "Recognise horizontal motion is uniform and vertical motion is uniformly accelerated (g downward).",
+      "Predict how launch angle and speed change range, maximum height and time of flight.",
+      "Verify that range is maximum at 45 degrees and equal for complementary angles."
+    ],
+    "physics": {
+      "equations": [
+        "u_x = u cos(theta), u_y = u sin(theta)",
+        "x(t) = u cos(theta) * t",
+        "y(t) = u sin(theta) * t - (1/2) g t^2",
+        "v_x = u cos(theta) (constant), v_y = u sin(theta) - g t",
+        "T = 2 u sin(theta) / g",
+        "H = u^2 sin^2(theta) / (2g)",
+        "R = u^2 sin(2 theta) / g",
+        "y = x tan(theta) - g x^2 / (2 u^2 cos^2(theta))  (parabola)"
+      ],
+      "parameters": [
+        {
+          "name": "Initial speed",
+          "symbol": "u",
+          "unit": "m/s",
+          "min": 5,
+          "max": 50,
+          "default": 20
+        },
+        {
+          "name": "Launch angle",
+          "symbol": "theta",
+          "unit": "degrees",
+          "min": 5,
+          "max": 85,
+          "default": 45
+        },
+        {
+          "name": "Acceleration due to gravity",
+          "symbol": "g",
+          "unit": "m/s^2",
+          "min": 1.6,
+          "max": 25,
+          "default": 9.8
+        },
+        {
+          "name": "Animation speed",
+          "symbol": "k",
+          "unit": "x real time",
+          "min": 0.25,
+          "max": 2,
+          "default": 1
+        }
+      ],
+      "state_update": "Each frame: t += k * dt (dt = real elapsed seconds, capped at 0.05); x = u*cos(theta)*t; y = u*sin(theta)*t - 0.5*g*t*t; vx = u*cos(theta); vy = u*sin(theta) - g*t; if y < 0 then set t = T, x = R, y = 0, stop animation. Use closed-form equations, not Euler stepping. Convert theta to radians before trig."
+    },
+    "visualization": "Canvas 800x450 px. Ground line at bottom; origin at left with small margin. Scale: pixels per metre = min(700 / Rmax, 350 / Hmax) where Rmax and Hmax computed at u=50, theta=45 and 90 for current g, so all trajectories fit; draw axis ticks in metres. Draw full dotted predicted parabola from the trajectory equation before launch. Animate a filled red circle for the ball leaving a fading trail of dots. Draw velocity vector as green arrow, with light blue horizontal and orange vertical component arrows. Mark H with dashed horizontal line and R with a marker on the ground. Show a 'Compare 30 and 60' toggle drawing both trajectories in grey to show equal range.",
+    "controls": [
+      "Slider: Initial speed u (m/s), 5-50, step 1",
+      "Slider: Launch angle theta (degrees), 5-85, step 1",
+      "Slider: g (m/s^2), 1.6-25, step 0.1, with preset labels Moon 1.6, Earth 9.8, Jupiter 24.8",
+      "Button: Launch / Reset",
+      "Checkbox: Show complementary angle (90 - theta) trajectory"
+    ],
+    "readouts": [
+      "u_x = u cos(theta) (m/s) and u_y = u sin(theta) (m/s)",
+      "Time t (s) and current x (m), y (m)",
+      "Current v_x (m/s), v_y (m/s), speed (m/s)",
+      "Time of flight T = 2u sin(theta)/g (s)",
+      "Maximum height H = u^2 sin^2(theta)/(2g) (m)",
+      "Range R = u^2 sin(2theta)/g (m)",
+      "Equations printed: x = u cos(theta) t ; y = u sin(theta) t - (1/2) g t^2"
+    ],
+    "observations": [
+      "The horizontal velocity arrow never changes length; only the vertical arrow shrinks, becomes zero at the top, then grows downward.",
+      "At the highest point v_y = 0 but v_x is not zero, so the ball is still moving.",
+      "Slide theta from 5 to 85: range rises, peaks at 45 degrees, then falls. Angles 30 and 60 give the same range.",
+      "Doubling u makes R and H four times larger (they depend on u^2), but T only doubles.",
+      "Reducing g (Moon) stretches the parabola: longer time, higher peak, longer range for the same launch."
+    ],
+    "questions": [
+      {
+        "q": "A ball is launched at 20 m/s at 30 degrees on Earth (g = 9.8 m/s^2). What is its time of flight?",
+        "options": [
+          "1.02 s",
+          "2.04 s",
+          "3.53 s",
+          "4.08 s"
+        ],
+        "answer": "2.04 s",
+        "explanation": "T = 2u sin(theta)/g = 2*20*0.5/9.8 = 2.04 s."
+      },
+      {
+        "q": "At the highest point of its path, the projectile's velocity is:",
+        "options": [
+          "zero",
+          "purely vertical",
+          "purely horizontal, equal to u cos(theta)",
+          "equal to u"
+        ],
+        "answer": "purely horizontal, equal to u cos(theta)",
+        "explanation": "v_y = 0 at the top, but v_x = u cos(theta) is unchanged because there is no horizontal acceleration."
+      },
+      {
+        "q": "Two projectiles are fired with the same speed at 35 degrees and 55 degrees. Which statement is true?",
+        "options": [
+          "Both have the same range and the same maximum height",
+          "Both have the same range but 55 degrees goes higher",
+          "35 degrees has the larger range",
+          "55 degrees has the larger range"
+        ],
+        "answer": "Both have the same range but 55 degrees goes higher",
+        "explanation": "sin(2*35) = sin(70) = sin(110) = sin(2*55), so ranges are equal; H depends on sin^2(theta), which is larger for 55 degrees."
+      }
+    ],
+    "misconceptions": [
+      "The velocity is zero at the top of the path (only v_y is zero).",
+      "Acceleration is zero at the highest point (it is g downward throughout).",
+      "A heavier ball follows a different path (mass does not appear in any equation; air resistance is neglected).",
+      "Larger launch angle always gives larger range (range peaks at 45 degrees).",
+      "The ball has a 'forward force' keeping it moving horizontally (only gravity acts after launch)."
+    ],
+    "grade_language_notes": "Class 11 level: use trigonometric resolution of vectors and the kinematic equations of uniformly accelerated motion; no derivatives or integrals. Use 'component', 'time of flight', 'maximum height', 'horizontal range' exactly as in NCERT. State clearly that air resistance is neglected and g is taken constant. Angles in degrees on screen; note conversion to radians is internal."
+  }
+}

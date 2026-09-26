@@ -1,0 +1,138 @@
+{
+  "topic": "Class 10 Maths: Heights and distances (applications of trigonometry)",
+  "grade": 10,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-23 10:41",
+  "cost_usd": 0.044388,
+  "in_tokens": 682,
+  "out_tokens": 2083,
+  "seconds": 25.04,
+  "plan": {
+    "title": "Heights and Distances: Tower, Observer and Line of Sight",
+    "grade": 10,
+    "subject": "Mathematics",
+    "ncert_refs": [
+      "NCERT Class 10 Maths Ch 9: Some Applications of Trigonometry, 9.2 Heights and Distances",
+      "Examples 1-7, Exercise 9.1"
+    ],
+    "learning_objectives": [
+      "Identify line of sight, horizontal level and angle of elevation or depression.",
+      "Use tan θ = opposite/adjacent in a right triangle to find an unknown height or distance.",
+      "Explain why the angle of elevation increases as the observer walks closer.",
+      "Recognise that the angle of depression from the top equals the angle of elevation from the observer."
+    ],
+    "physics": {
+      "equations": [
+        "tan θ = (H − h)/d",
+        "H = h + d·tan θ",
+        "L = d / cos θ (line of sight length)",
+        "angle of depression from top = θ (alternate angles)",
+        "tan 30° = 1/√3, tan 45° = 1, tan 60° = √3"
+      ],
+      "parameters": [
+        {
+          "name": "Horizontal distance from tower",
+          "symbol": "d",
+          "unit": "m",
+          "min": 5,
+          "max": 100,
+          "default": 30
+        },
+        {
+          "name": "Angle of elevation",
+          "symbol": "θ",
+          "unit": "degree",
+          "min": 10,
+          "max": 80,
+          "default": 30
+        },
+        {
+          "name": "Observer eye height",
+          "symbol": "h",
+          "unit": "m",
+          "min": 0,
+          "max": 2,
+          "default": 0
+        },
+        {
+          "name": "Walking speed",
+          "symbol": "v",
+          "unit": "m/s",
+          "min": 0.5,
+          "max": 5,
+          "default": 2
+        }
+      ],
+      "state_update": "Static mode: H = h + d·tan(θ·π/180). Walk mode: H is held fixed; each frame d ← max(5, d − v·dt) with dt in seconds; recompute θ = atan((H − h)/d)·180/π and sync the d and θ sliders. Stop when d reaches 5 m or on Pause."
+    },
+    "visualization": "Side view on a canvas. A ground line, a tower of height H at the right, and a stick-figure observer at distance d whose eye is at height h. A dashed horizontal line from the eye and a solid line of sight from the eye to the tower top form a shaded right triangle. Draw the θ arc at the eye, and the equal angle-of-depression arc at the tower top. Label d, H − h and L. Auto-scale so that 1 m maps to a fixed number of pixels that fits the tallest H.",
+    "controls": [
+      "Slider: distance d (m), 5–100",
+      "Slider: angle of elevation θ (°), 10–80",
+      "Slider: eye height h (m), 0–2",
+      "Slider: walking speed v (m/s), 0.5–5",
+      "Buttons: Walk towards tower / Pause / Reset"
+    ],
+    "readouts": [
+      "θ (°) and tan θ (4 decimals)",
+      "d (m)",
+      "H − h (m)",
+      "Tower height H (m)",
+      "Line of sight L (m)",
+      "Angle of depression from top (°)",
+      "Equation shown: H = h + d·tan θ"
+    ],
+    "observations": [
+      "For fixed d, a larger θ gives a taller tower.",
+      "At θ = 45°, the height above the eye equals d.",
+      "As you walk closer to the same tower, θ increases.",
+      "The angle of depression from the top always equals θ.",
+      "Adding eye height h raises H by exactly h."
+    ],
+    "questions": [
+      {
+        "q": "The angle of elevation of a tower's top is 30° from 30 m away (h = 0). What is H?",
+        "options": [
+          "10√3 m ≈ 17.32 m",
+          "30√3 m",
+          "15 m",
+          "60 m"
+        ],
+        "answer": "10√3 m ≈ 17.32 m",
+        "explanation": "H = 30 × tan 30° = 30/√3 = 10√3 m."
+      },
+      {
+        "q": "If θ = 45° and d = 20 m with h = 0, what is the height of the tower?",
+        "options": [
+          "20 m",
+          "10 m",
+          "20√2 m",
+          "40 m"
+        ],
+        "answer": "20 m",
+        "explanation": "tan 45° = 1, so H = d = 20 m."
+      },
+      {
+        "q": "An observer walks towards a tower. What happens to the angle of elevation?",
+        "options": [
+          "It increases",
+          "It decreases",
+          "It stays the same",
+          "It becomes zero"
+        ],
+        "answer": "It increases",
+        "explanation": "H is fixed and d decreases, so tan θ = H/d increases and θ increases."
+      }
+    ],
+    "misconceptions": [
+      "Measuring the angle from the vertical instead of from the horizontal.",
+      "Using sin or cos when opposite and adjacent sides are given.",
+      "Forgetting to add the observer's eye height to the calculated height.",
+      "Thinking the angle of depression is measured from the vertical tower.",
+      "Believing θ doubles when d is halved (tan is not linear)."
+    ],
+    "grade_language_notes": "Use only the ratios sin, cos and tan and the standard angles 30°, 45° and 60°. Use the words line of sight, horizontal level, angle of elevation and angle of depression. Give answers in surd form and as decimals. Avoid calculus and radian-heavy wording."
+  }
+}

@@ -1,0 +1,9 @@
+# topic | grade   — one per line, fed to make_blueprints.py
+Class 10 Science: Refraction of light through a convex lens | 10
+Class 10 Science: Reflection of light by a concave mirror | 10
+Class 9 Maths: Total surface area and volume of a cone | 9
+Class 10 Maths: Heights and distances (applications of trigonometry) | 10
+Class 9 Science: Newton's second law of motion | 9
+Class 11 Physics: Rolling motion | 11
+Class 12 Physics: Nuclear fusion | 12
+Class 11 Biology: Osmosis and diffusion | 11

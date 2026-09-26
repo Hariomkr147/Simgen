@@ -1,0 +1,136 @@
+{
+  "topic": "Biotechnology: Principles and Processes DNA isolation → restriction → ligation → transformation",
+  "grade": 12,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-25 13:42",
+  "cost_usd": 0.046436,
+  "in_tokens": 689,
+  "out_tokens": 2184,
+  "seconds": 24.82,
+  "plan": {
+    "title": "Recombinant DNA Workflow: Isolate, Cut, Join, Transform",
+    "grade": 12,
+    "subject": "Biology",
+    "ncert_refs": [
+      "NCERT Class 12 Biology Ch 9: Biotechnology Principles and Processes, 9.1 Principles, 9.2.1 Restriction Enzymes",
+      "NCERT Class 12 Biology 9.3.1 Isolation of DNA, 9.3.2 Cutting, 9.3.5 Insertion into host (competent cells, heat shock)"
+    ],
+    "learning_objectives": [
+      "Sequence the steps from DNA isolation to selection of transformants.",
+      "Predict the number of EcoRI fragments from DNA length and site frequency.",
+      "Explain sticky ends, DNA ligase action and antibiotic selection.",
+      "Relate CaCl2 plus heat shock to transformation success."
+    ],
+    "physics": {
+      "equations": [
+        "Site probability P = (1/4)^s",
+        "Expected sites n = L × P",
+        "Linear DNA fragments = n + 1, circular plasmid fragments = n",
+        "Fraction of sites cut f(t) = 1 − e^(−t/τ), τ = 10 min",
+        "Average fragment length = L/(n+1)",
+        "Colonies N = E × m × F, E = 10^6 per µg with heat shock (42 °C), 10^3 per µg without"
+      ],
+      "parameters": [
+        {
+          "name": "Recognition site length",
+          "symbol": "s",
+          "unit": "bp",
+          "min": 4,
+          "max": 8,
+          "default": 6
+        },
+        {
+          "name": "DNA length",
+          "symbol": "L",
+          "unit": "bp",
+          "min": 1000,
+          "max": 50000,
+          "default": 20000
+        },
+        {
+          "name": "Digestion time",
+          "symbol": "t",
+          "unit": "min",
+          "min": 0,
+          "max": 60,
+          "default": 30
+        },
+        {
+          "name": "Recombinant DNA added",
+          "symbol": "m",
+          "unit": "µg",
+          "min": 0.01,
+          "max": 1,
+          "default": 0.1
+        }
+      ],
+      "state_update": "Each frame: tSim += 0.5 min up to t; f = 1 − exp(−tSim/10); cutsShown = floor(f×n); fragments = cutsShown+1; after ligation step, N = E×m×F with F = 0.01 plating fraction; draw min(N,300) colonies."
+    },
+    "visualization": "Four-panel pipeline on canvas: lysed cell releasing DNA spooled by chilled ethanol; DNA bar with GAATTC sites showing staggered cuts; sticky ends annealing into plasmid with ligase glow; ampicillin plate filling with colonies.",
+    "controls": [
+      "Slider s: 4–8 bp, step 2",
+      "Slider L: 1000–50000 bp",
+      "Slider t: 0–60 min",
+      "Slider m: 0.01–1 µg",
+      "Toggle: heat shock 42 °C on/off; Button: Run step"
+    ],
+    "readouts": [
+      "Expected sites n",
+      "Fraction cut f (%)",
+      "Fragments and average length (bp)",
+      "Colonies N on ampicillin plate",
+      "Equation strip: n = L(1/4)^s"
+    ],
+    "observations": [
+      "Longer recognition sites cut less often and give larger fragments.",
+      "Longer digestion raises the fraction of sites cut until nearly complete.",
+      "Sticky ends from the same enzyme pair and are sealed by ligase.",
+      "Without heat shock, colony count falls about a thousandfold.",
+      "Only cells carrying the ampicillin-resistance gene grow on the plate."
+    ],
+    "questions": [
+      {
+        "q": "How many EcoRI sites are expected in 20480 bp of random DNA?",
+        "options": [
+          "2",
+          "5",
+          "20",
+          "80"
+        ],
+        "answer": "5",
+        "explanation": "20480 × (1/4)^6 = 20480/4096 = 5."
+      },
+      {
+        "q": "Why is chilled ethanol added during DNA isolation?",
+        "options": [
+          "To cut DNA",
+          "To precipitate DNA",
+          "To kill bacteria",
+          "To add sticky ends"
+        ],
+        "answer": "To precipitate DNA",
+        "explanation": "Purified DNA precipitates as fine threads in chilled ethanol."
+      },
+      {
+        "q": "Which enzyme joins the vector and insert?",
+        "options": [
+          "EcoRI",
+          "Lysozyme",
+          "DNA ligase",
+          "Protease"
+        ],
+        "answer": "DNA ligase",
+        "explanation": "Ligase forms phosphodiester bonds between annealed sticky ends."
+      }
+    ],
+    "misconceptions": [
+      "Restriction enzymes do not cut randomly; they cut at specific palindromic sequences.",
+      "Sticky ends are held by hydrogen bonds until ligase seals the backbone.",
+      "Heat shock does not create DNA; it helps cells take up DNA.",
+      "Ampicillin selects plasmid-carrying cells, not only recombinant ones."
+    ],
+    "grade_language_notes": "Use NCERT terms: palindrome, sticky ends, competent cells, selectable marker; use only powers and ratios, and present the exponential as a given curve."
+  }
+}

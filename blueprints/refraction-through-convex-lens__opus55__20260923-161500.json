@@ -1,0 +1,127 @@
+{
+  "topic": "refraction-through-convex-lens",
+  "grade": null,
+  "teacher": "OPUS55",
+  "model": "OPUS55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-23 16:15",
+  "cost_usd": 0.038444,
+  "in_tokens": 671,
+  "out_tokens": 1788,
+  "seconds": 24.48,
+  "plan": {
+    "title": "Image Formation by a Convex Lens",
+    "grade": 10,
+    "subject": "Physics",
+    "ncert_refs": [
+      "NCERT Science Class 10, Ch 9 Light – Reflection and Refraction, 9.3.3 Image formation by lenses",
+      "9.3.4 Ray diagrams (Fig 9.16)",
+      "9.3.6 Lens formula and magnification",
+      "9.3.7 Power of a lens"
+    ],
+    "learning_objectives": [
+      "Draw ray diagrams for a convex lens using three standard rays.",
+      "Apply the lens formula with the New Cartesian sign convention.",
+      "Predict image position, nature and size for any object position."
+    ],
+    "physics": {
+      "equations": [
+        "1/v - 1/u = 1/f",
+        "m = h'/h = v/u",
+        "P = 1/f (f in metres), unit dioptre D"
+      ],
+      "parameters": [
+        {
+          "name": "Focal length",
+          "symbol": "f",
+          "unit": "cm",
+          "min": 5,
+          "max": 20,
+          "default": 10
+        },
+        {
+          "name": "Object distance (magnitude)",
+          "symbol": "|u|",
+          "unit": "cm",
+          "min": 2,
+          "max": 50,
+          "default": 25
+        },
+        {
+          "name": "Object height",
+          "symbol": "h",
+          "unit": "cm",
+          "min": 1,
+          "max": 5,
+          "default": 2
+        }
+      ],
+      "state_update": "On any slider input: u=-|u|; if abs(|u|-f)<0.05 then image at infinity (v undefined); else v=1/(1/f+1/u), m=v/u, h'=m*h, P=100/f; redraw scene."
+    },
+    "visualization": "Canvas with principal axis, convex lens at centre O, marks F1, F2, 2F1, 2F2; upright object arrow at x=u; three rays drawn: ray parallel to axis refracts through F2, ray through O goes undeviated, ray through F1 emerges parallel; solid image arrow for real image, dashed arrow and dashed backward ray extensions for virtual image; scale 10 px per cm.",
+    "controls": [
+      "Slider: focal length f (cm), 5–20",
+      "Slider: object distance |u| (cm), 2–50",
+      "Slider: object height h (cm), 1–5"
+    ],
+    "readouts": [
+      "u (cm, signed)",
+      "v (cm, signed) or 'at infinity'",
+      "m (2 decimals)",
+      "h' (cm)",
+      "P (D)",
+      "Nature: real/virtual, inverted/erect, magnified/diminished/same size",
+      "Equation shown: 1/v − 1/u = 1/f"
+    ],
+    "observations": [
+      "Object beyond 2F1: real, inverted, diminished image between F2 and 2F2.",
+      "Object at 2F1: real, inverted, same-size image at 2F2.",
+      "Object between F1 and 2F1: real, inverted, magnified image beyond 2F2.",
+      "Object at F1: rays emerge parallel, image at infinity.",
+      "Object between F1 and O: virtual, erect, magnified image on the same side as the object.",
+      "A smaller f gives a larger power P."
+    ],
+    "questions": [
+      {
+        "q": "An object is 30 cm from a convex lens of f = 15 cm. Where is the image?",
+        "options": [
+          "15 cm, left side",
+          "30 cm, right side",
+          "60 cm, right side",
+          "At infinity"
+        ],
+        "answer": "30 cm, right side",
+        "explanation": "1/v = 1/15 + 1/(−30) = 1/30, so v = +30 cm; the object is at 2F1."
+      },
+      {
+        "q": "For which object position does a convex lens act as a magnifying glass?",
+        "options": [
+          "Beyond 2F1",
+          "At 2F1",
+          "Between F1 and O",
+          "At F1"
+        ],
+        "answer": "Between F1 and O",
+        "explanation": "The image is then virtual, erect and magnified."
+      },
+      {
+        "q": "What is the power of a convex lens with f = 20 cm?",
+        "options": [
+          "+0.05 D",
+          "+5 D",
+          "−5 D",
+          "+20 D"
+        ],
+        "answer": "+5 D",
+        "explanation": "P = 1/f = 1/0.20 m = +5 D."
+      }
+    ],
+    "misconceptions": [
+      "Treating u as positive in the formula; u is negative for a real object.",
+      "Believing a convex lens always forms a real image.",
+      "Thinking that blocking half the lens removes half the image; the full image forms, only dimmer.",
+      "Thinking that a negative m means a smaller image; the sign shows orientation, |m| shows size."
+    ],
+    "grade_language_notes": "Use Class 10 terms only: optical centre, principal focus, principal axis, real/virtual, erect/inverted. Use algebra with fractions only, no calculus. Always state the New Cartesian sign convention, with distances measured from O and the right side positive."
+  }
+}

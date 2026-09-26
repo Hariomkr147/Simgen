@@ -1,0 +1,125 @@
+{
+  "topic": "Class 9 Maths: Total surface area and volume of a cone",
+  "grade": 9,
+  "teacher": "opus55",
+  "model": "opus55:anthropic/claude-opus-5.5",
+  "rag": false,
+  "created": "2026-09-23 10:41",
+  "cost_usd": 0.040132,
+  "in_tokens": 678,
+  "out_tokens": 1871,
+  "seconds": 24.11,
+  "plan": {
+    "title": "Cone Explorer: Slant Height, Surface Area and Volume",
+    "grade": 9,
+    "subject": "Mathematics",
+    "ncert_refs": [
+      "NCERT Class 9 Maths, Chapter 11: Surface Areas and Volumes (cone)"
+    ],
+    "learning_objectives": [
+      "Find slant height using l = √(r² + h²).",
+      "Find curved and total surface area of a right circular cone.",
+      "See that a cone's volume is one-third of a cylinder with the same base and height."
+    ],
+    "physics": {
+      "equations": [
+        "l = √(r² + h²)",
+        "CSA = πrl",
+        "TSA = πr(l + r)",
+        "V = (1/3)πr²h",
+        "Sector angle θ = 360° × r / l",
+        "V_cylinder = πr²h = 3V"
+      ],
+      "parameters": [
+        {
+          "name": "Base radius",
+          "symbol": "r",
+          "unit": "cm",
+          "min": 1,
+          "max": 10,
+          "default": 5
+        },
+        {
+          "name": "Height",
+          "symbol": "h",
+          "unit": "cm",
+          "min": 1,
+          "max": 15,
+          "default": 12
+        },
+        {
+          "name": "Animation progress",
+          "symbol": "t",
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "default": 0
+        }
+      ],
+      "state_update": "On any slider input, recompute l, CSA, TSA, V and θ using π = 22/7 and redraw. Each frame, add 0.5×dt(s) to t while playing, clamp t at 1. In Unroll mode, draw the curved surface opening into a sector of radius l and angle θ×t. In Pour mode, fill the cylinder to level floor(3t)/3 × h plus a partial pour for the fraction of 3t."
+    },
+    "visualization": "Left: 2D canvas cone with labelled r, h and l forming a right triangle. Right: either the unrolling sector with its arc of length 2πr, or a same-size cylinder filled by 3 cone-fuls.",
+    "controls": [
+      "Slider: radius r (cm), 1–10, step 0.5",
+      "Slider: height h (cm), 1–15, step 0.5",
+      "Toggle button: Unroll mode / Pour mode",
+      "Button: Play/Reset animation"
+    ],
+    "readouts": [
+      "l (cm), 2 decimals",
+      "CSA (cm²)",
+      "TSA (cm²)",
+      "V (cm³)",
+      "Cylinder volume (cm³) and the ratio V_cyl / V_cone",
+      "Sector angle θ (°)"
+    ],
+    "observations": [
+      "The slant height is always longer than both r and h.",
+      "The unrolled curved surface is a sector whose arc length equals the base circumference 2πr.",
+      "Exactly 3 cone-fuls fill the matching cylinder.",
+      "Doubling r makes V four times larger; doubling h only doubles V."
+    ],
+    "questions": [
+      {
+        "q": "A cone has r = 7 cm and h = 24 cm. What is its slant height?",
+        "options": [
+          "25 cm",
+          "31 cm",
+          "17 cm",
+          "24 cm"
+        ],
+        "answer": "25 cm",
+        "explanation": "l = √(49 + 576) = √625 = 25 cm."
+      },
+      {
+        "q": "For the same cone, what is the total surface area? (π = 22/7)",
+        "options": [
+          "550 cm²",
+          "704 cm²",
+          "1232 cm²",
+          "154 cm²"
+        ],
+        "answer": "704 cm²",
+        "explanation": "TSA = (22/7)×7×(25+7) = 22×32 = 704 cm²."
+      },
+      {
+        "q": "If the radius is doubled and the height kept the same, the volume becomes:",
+        "options": [
+          "2 times",
+          "4 times",
+          "8 times",
+          "Same"
+        ],
+        "answer": "4 times",
+        "explanation": "V = (1/3)πr²h, and r² becomes 4r²."
+      }
+    ],
+    "misconceptions": [
+      "Using h instead of l in the CSA formula πrl.",
+      "Forgetting the base area πr² when finding TSA.",
+      "Thinking a cone's volume is half that of the matching cylinder instead of one-third.",
+      "Assuming doubling r doubles the volume."
+    ],
+    "grade_language_notes": "Use Class 9 terms: radius, height, slant height, curved surface area, total surface area. Use Pythagoras and π = 22/7 as in NCERT. No calculus or trigonometry."
+  }
+}

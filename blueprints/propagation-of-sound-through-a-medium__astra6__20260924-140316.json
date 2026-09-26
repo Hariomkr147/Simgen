@@ -1,0 +1,119 @@
+{
+  "topic": "propagation of sound through a medium",
+  "grade": 9,
+  "teacher": "astra6",
+  "model": "astra6:openai/gpt-6-astra",
+  "rag": false,
+  "created": "2026-09-24 14:03",
+  "cost_usd": 0.09252,
+  "in_tokens": 452,
+  "out_tokens": 1760,
+  "seconds": 41.36,
+  "plan": {
+    "title": "Sound Travels; Particles Vibrate",
+    "grade": 9,
+    "subject": "Science",
+    "ncert_refs": [
+      "NCERT Class 9 Science, Sound: Propagation of Sound",
+      "NCERT Class 9 Science, Sound: Characteristics of a Sound Wave"
+    ],
+    "learning_objectives": [
+      "Identify sound in air as a longitudinal wave.",
+      "Distinguish travelling compressions from vibrating particles.",
+      "Relate wave speed, frequency and wavelength using v = fλ.",
+      "Compare the effects of amplitude and frequency."
+    ],
+    "physics": {
+      "equations": [
+        "Assume uniform air at approximately 22 °C: v = 344 m/s.",
+        "λ = v/f; T = 1/f.",
+        "A_m = A/1000, where A is the amplitude in mm.",
+        "u(x₀,t) = A_m sin[2πf(t − x₀/v)].",
+        "x(x₀,t) = x₀ + u(x₀,t).",
+        "C(x₀,t) = cos[2πf(t − x₀/v)]; positive C marks compression and negative C marks rarefaction.",
+        "Displayed position: x_display = x₀ + 80u(x₀,t)."
+      ],
+      "parameters": [
+        {
+          "name": "Frequency",
+          "symbol": "f",
+          "unit": "Hz",
+          "min": 100,
+          "max": 400,
+          "default": 200
+        },
+        {
+          "name": "Particle displacement amplitude",
+          "symbol": "A",
+          "unit": "mm",
+          "min": 0.1,
+          "max": 0.5,
+          "default": 0.3
+        }
+      ],
+      "state_update": "Initialize t = 0; each animation frame set Δt = min(elapsed wall seconds, 0.05), advance t by 0.005Δt, evaluate u and C at every fixed equilibrium position, and redraw without integrating velocities; reset t = 0 on either slider change."
+    },
+    "visualization": "Deliver one offline HTML file with embedded CSS and JavaScript, no external assets or network requests, and a responsive canvas showing seven rows of 121 representative air elements at x₀ = 0.05i m for i = 0…120, each moving horizontally at x_display; use a fixed 0–6 m axis with edge padding, shade compression regions blue and rarefactions pale orange using C, highlight the element at x₀ = 3 m with its equilibrium marker, draw a rightward propagation arrow, mark one wavelength between consecutive compression centres, and label displacement magnification ×80, playback at 1/200 real speed, and a continuous travelling wave without reflections.",
+    "controls": [
+      "Frequency f (Hz): range slider, 100–400, step 10.",
+      "Amplitude A (mm): range slider, 0.1–0.5, step 0.05."
+    ],
+    "readouts": [
+      "Wave speed: 344 m/s, fixed.",
+      "Frequency: f Hz.",
+      "Actual particle amplitude: A mm, not the magnified display value.",
+      "Wavelength: λ = 344/f m, rounded to 3 decimals.",
+      "Time period: T = 1000/f ms, rounded to 2 decimals.",
+      "Simulated time: 1000t ms, rounded to 1 decimal.",
+      "Highlighted element displacement: 1000u(3,t) mm, rounded to 3 decimals.",
+      "Print governing relations v = fλ and T = 1/f beside the canvas."
+    ],
+    "observations": [
+      "Watch the highlighted element oscillate parallel to the direction of propagation without travelling across the medium.",
+      "Follow closely spaced regions to see compressions moving right.",
+      "Increase frequency at fixed wave speed to shorten wavelength and reduce the time period.",
+      "Increase amplitude to increase particle excursion without changing wave speed or wavelength.",
+      "Sound transfers energy through the medium without a net transport of its material in this model."
+    ],
+    "questions": [
+      {
+        "q": "What travels from left to right?",
+        "options": [
+          "The disturbance",
+          "Each air element permanently",
+          "The equilibrium markers"
+        ],
+        "answer": "The disturbance",
+        "explanation": "Air elements oscillate about their equilibrium positions while compressions and rarefactions propagate."
+      },
+      {
+        "q": "At fixed speed, what happens to wavelength when frequency doubles?",
+        "options": [
+          "It doubles",
+          "It halves",
+          "It stays unchanged"
+        ],
+        "answer": "It halves",
+        "explanation": "Since λ = v/f, doubling f halves λ."
+      },
+      {
+        "q": "What changes when amplitude increases at fixed frequency?",
+        "options": [
+          "Particle excursion increases",
+          "Wavelength increases",
+          "Wave speed increases"
+        ],
+        "answer": "Particle excursion increases",
+        "explanation": "Larger amplitude generally corresponds to louder sound, while frequency determines pitch."
+      }
+    ],
+    "misconceptions": [
+      "Sound in air is longitudinal, not a transverse up-and-down motion.",
+      "Particles do not travel with a compression.",
+      "Increasing frequency does not increase sound speed in this fixed medium.",
+      "The dots represent air elements rather than a literal molecular lattice.",
+      "Sound requires a medium and cannot propagate through a vacuum."
+    ],
+    "grade_language_notes": "Use compression, rarefaction, amplitude, frequency, wavelength and time period in the learner interface; keep trigonometric formulas internal, use no calculus, and make each question answer reveal on click."
+  }
+}

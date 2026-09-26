@@ -1,0 +1,5 @@
+openai>=1.40
+psycopg[binary]>=3.1   # only needed when NCERT_DSN is set
+flask>=3.0
+
+gunicorn>=21.2
