@@ -19,3 +19,8 @@ runs-dry/
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# pre-generated content: ship the app, not a pre-built library -- visitors generate
+# and view their own simulations instead of seeing pre-loaded ones
+Best Sim/
+blueprints/

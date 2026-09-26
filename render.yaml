@@ -32,3 +32,5 @@ services:
         value: "95.6"
       - key: NCERT_DSN
         sync: false
+      - key: ACCESS_CODE
+        sync: false

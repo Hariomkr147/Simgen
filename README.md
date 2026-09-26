@@ -129,3 +129,11 @@ Notes:
 - The `--timeout 120` on the start command matters: a real model call can take
   30s–2min, and gunicorn's default 30s worker timeout would kill the request
   mid-generation.
+- This repo ships the app only, not a pre-built library: `runs/`, `blueprints/`
+  and `Best Sim/` are all excluded (see `.gitignore`). A fresh deploy starts
+  with empty "Blueprints" and "Library" sections -- visitors generate and view
+  their own simulations rather than browsing pre-loaded ones.
+- Set `ACCESS_CODE` (dashboard Environment tab, not in the repo) to require a
+  shared code before `/run` will trigger a real (paid) generation. Leave it
+  unset to run open, e.g. for local/private use. Viewing the page and any
+  already-generated sims is never gated -- only the "Generate" action is.

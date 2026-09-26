@@ -15,13 +15,16 @@ import time
 from pathlib import Path
 from urllib.parse import urlencode
 
-from flask import Flask, Response, request
+from flask import Flask, Response, make_response, request
 
 from simgen import pipeline
 from simgen.__main__ import load_env, slug
 
 load_env()
 app = Flask(__name__)
+# Set ACCESS_CODE to gate the /run (generate) endpoint behind a shared code --
+# protects your model-API budget on a public deploy. Empty (default) = no gate.
+ACCESS_CODE = os.environ.get("ACCESS_CODE", "").strip()
 RUNS = Path("runs")
 LOG = RUNS / "library.jsonl"
 BEST_DIR = Path("Best Sim")   # "Save best" button copies chosen sims here
@@ -151,6 +154,7 @@ table.bp a{color:var(--accent)}
         <label style="text-transform:none;display:flex;align-items:center;gap:.4rem">
           <input type="checkbox" name="reuse" @@REUSE@@ style="width:auto"> reuse stored blueprint</label></div>
     </div>
+    @@ACCESS_FIELD@@
     <div class="actions">
       <fieldset>
         <label><input type="checkbox" name="modes" value="teacher_only" @@M_TO@@> teacher_only</label>
@@ -178,6 +182,10 @@ table.bp a{color:var(--accent)}
   @@LIBRARY@@
 </div>
 </div></body></html>"""
+
+ACCESS_FIELD = '''<div class="field"><label for="access_code">Access code</label>
+      <input id="access_code" name="access_code" type="password" value="@@ACCESS_VAL@@"
+             placeholder="ask the owner for the code" autocomplete="off"></div>'''
 
 
 def model_options(kind, selected):
@@ -375,6 +383,8 @@ def render(topic="", grade="", teacher=None, student=None, modes=("teacher_stude
         "@@BP_OPTIONS@@": "".join(f'<option value="{html.escape(r["topic"])}">' for r in bps),
         "@@BLUEPRINTS@@": render_blueprints(bps), "@@BP_COUNT@@": str(len(bps)),
         "@@RATE@@": f"{USD_INR:.2f}", "@@RESULTS@@": results, "@@LIBRARY@@": lib_html, "@@LIB_COUNT@@": str(lib_count),
+        "@@ACCESS_FIELD@@": (ACCESS_FIELD.replace("@@ACCESS_VAL@@", html.escape(request.cookies.get("access_code", "")))
+                             if ACCESS_CODE else ""),
     }.items():
         out = out.replace(key, val)
     return out
@@ -397,6 +407,15 @@ def run():
     reuse = bool(request.form.get("reuse"))
     run_slug = slug(topic)
     g = int(grade) if grade else None
+
+    # Access gate: every model call here costs real money, so a public deploy can require
+    # a shared code (ACCESS_CODE) before it'll actually run the pipeline. No code entered
+    # or a mismatch just re-renders the form with the submitted values and an error --
+    # no generation happens. The code itself is never trusted from a cookie, only from the
+    # submitted form field; the cookie set below only pre-fills the input for convenience.
+    if ACCESS_CODE and request.form.get("access_code", "").strip() != ACCESS_CODE:
+        err = '<div class="panel"><p class="err">Incorrect access code — ask the owner for the current one.</p></div>'
+        return render(topic, grade, teacher, student, modes, use_rag, err, reuse)
 
     cards = []
     for mode in modes:
@@ -483,7 +502,10 @@ def run():
           <div class="split"><a href="/view/{run_slug}/{name}" target="_blank">open with full details</a></div>
         </div>''')
 
-    return render(topic, grade, teacher, student, modes, use_rag, "\n".join(cards), reuse)
+    resp = make_response(render(topic, grade, teacher, student, modes, use_rag, "\n".join(cards), reuse))
+    if ACCESS_CODE:  # convenience only -- /run always re-checks the submitted form field, never this cookie
+        resp.set_cookie("access_code", ACCESS_CODE, max_age=60 * 60 * 24 * 30, httponly=True, samesite="Lax")
+    return resp
 
 
 def render_blueprint_card(rec, fresh):
