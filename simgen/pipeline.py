@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 from .llm import Usage, call
-from .retrieve import ncert_context
+from .retrieve import ncert_context, NCERTError
 
 # ---------------------------------------------------------------- shared spec
 #
@@ -53,6 +53,7 @@ LAB_RULES = """What makes a good Lab app (it is judged on this):
 PLAN_SCHEMA = """{
   "title": str,
   "grade": int, "subject": str, "ncert_refs": [str], "learning_objectives": [str],
+  "evidence": ["3-6 sentences copied VERBATIM from the NCERT SOURCE MATERIAL that the science relies on (empty list only if no source was given)"],
   "app": {"name": "2-3 words ending in Lab, e.g. Ester Lab", "subtitle": "Class N · chapter · focus",
           "mark": "1-2 chars for the logo", "accent": "#hex, saturated, readable on white",
           "accent_dark": "#hex, lighter tint of accent for dark mode"},
@@ -136,7 +137,9 @@ BUILD_SYS = ("You are an expert front-end engineer and science educator. You wri
 
 
 def _ctx(context):
-    return f"\n\nNCERT SOURCE MATERIAL (ground every fact in this):\n{context}\n" if context else ""
+    return ("\n\nNCERT SOURCE MATERIAL. Use ONLY facts, definitions, values and terms found in this text. "
+            "If something you would like to show is not in it, leave it out — do not fill gaps from memory:\n"
+            f"{context}\n") if context else ""
 
 
 def _plan_prompt(topic, grade, context):
@@ -321,6 +324,30 @@ def load_blueprint(topic, teacher=None):
     return None
 
 
+def _norm(t):
+    return re.sub(r"\s+", " ", str(t)).strip().lower()
+
+
+def verify_evidence(plan, context):
+    """(quoted, verified): how many of the blueprint's evidence quotes really occur in the
+    NCERT text it was given. A quote the model made up counts as quoted but not verified."""
+    src = _norm(context)
+    quotes = [q for q in (plan.get("evidence") or []) if isinstance(q, str) and q.strip()]
+    return len(quotes), sum(1 for q in quotes if _norm(q).rstrip(".") in src)
+
+
+def grounding(topic, grade, use_rag):
+    """NCERT text for a topic. RAG asked for but not delivered (no DSN, DB down, nothing on the
+    topic) raises NCERTError: 'grounded' must never silently mean 'ungrounded'."""
+    if not use_rag:
+        return ""
+    ctx = ncert_context(topic, grade)
+    if not ctx:
+        raise NCERTError(f"No NCERT text found for {topic!r} (grade {grade or 'any'}); set NCERT_DSN, "
+                         "or generate ungrounded (--no-rag / untick NCERT grounding).")
+    return ctx
+
+
 def blueprint(topic, grade, teacher, use_rag=True, force=False):
     """The teacher's blueprint for a topic: served from the store if present, else
     generated once and stored. Returns (record, [Usage]) — usages are only the calls
@@ -331,7 +358,7 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
         rec = load_blueprint(topic, teacher)
         if rec:
             return rec, []
-    context = ncert_context(topic, grade) if use_rag else ""
+    context = grounding(topic, grade, use_rag)
     usages = []
     # The Lab-app blueprint (steps + a question per step + think + words + visuals) runs
     # ~3-5k tokens; 12000 is a ceiling with room for reasoning, not a target. Models
@@ -342,12 +369,16 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
         usages.append(u)
         try:
             plan = extract_json(raw)
+            quoted, verified = verify_evidence(plan, context) if context else (0, 0)
+            if context and not verified:
+                raise ValueError("blueprint quotes no NCERT text: evidence missing or not found in the source")
             break
         except (ValueError, KeyError):
             if attempt == 2:
                 raise
     rec = {"schema": SCHEMA_VERSION, "topic": topic, "grade": grade, "teacher": teacher, "model": usages[-1].model,
-           "rag": bool(context), "created": time.strftime("%Y-%m-%d %H:%M"),
+           "rag": bool(context), "evidence": {"quoted": quoted, "verified": verified} if context else None,
+           "created": time.strftime("%Y-%m-%d %H:%M"),
            "cost_usd": round(sum(u.cost_usd for u in usages), 6),
            "in_tokens": sum(u.in_tokens for u in usages),
            "out_tokens": sum(u.out_tokens for u in usages),
@@ -371,7 +402,7 @@ def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True
             raise ValueError(f"{student} returned no TOPIC script.")
         return html_out, rec["plan"], usages + [u]
 
-    context = ncert_context(topic, grade) if use_rag else ""
+    context = grounding(topic, grade, use_rag)
     if mode in ("teacher_only", "student_only"):
         alias, role = (teacher, "teacher") if mode == "teacher_only" else (student, "student")
         text, u = call(alias, BUILD_SYS, _build_prompt(topic, grade, context), role=role)
