@@ -49,6 +49,12 @@ def _db_tests(dsn):
     assert any("echo" in r for r in ncert_chunks("Reflection of sound", 9, dsn=dsn))
     assert len(ncert_chunks("Class 10 Science: Reflection of Light", 10, k=1, dsn=dsn)) == 1
     assert any("pendulum" in r for r in ncert_chunks("Class 9 Science: Simple Pendulum Motion", 9, dsn=dsn)), "OR top-up"
+    with psycopg.connect(dsn, autocommit=True) as c:      # heading match must beat a passing mention
+        for t in ("## 8.2 Cells\nCells are studied in detail. Osmosis and diffusion diffusion diffusion osmosis osmosis are mentioned here.",
+                  "## 8.5 Osmosis and Diffusion\nWater moves across a membrane."):
+            c.execute("INSERT INTO knowledge_graph.graph_nodes (class_level, ground_truth_content) VALUES (11, %s)", (t,))
+    top = ncert_chunks("Class 11 Biology: Osmosis and diffusion", 11, k=2, dsn=dsn)
+    assert top[0].startswith("## 8.5 Osmosis"), top
     assert ncert_chunks("Class 10 Science: Quantum Chromodynamics", 10, dsn=dsn) == []
 
     # strict grounding through the pipeline: asked for, not delivered -> error, never silently ungrounded

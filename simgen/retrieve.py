@@ -8,13 +8,18 @@ to its content words, try them ANDed (precise), and top up with them ORed (recal
 import os
 import re
 
+# Rank by heading first: chunks look like "## 9.3 Refraction of Light\n<body>", so a section whose
+# title matches the topic (weight A) beats one that merely mentions the words in passing (weight D).
 DEFAULT_SQL = """
 SELECT ground_truth_content
-FROM knowledge_graph.graph_nodes
+FROM knowledge_graph.graph_nodes,
+     LATERAL (SELECT setweight(to_tsvector('english', split_part(ground_truth_content, chr(10), 1)), 'A')
+                  || setweight(to_tsvector('english', ground_truth_content), 'D') AS v,
+                     to_tsquery('english', %(tsq)s) AS tq) s
 WHERE ground_truth_content IS NOT NULL
   AND (%(grade)s IS NULL OR class_level = %(grade)s)
-  AND to_tsvector('english', ground_truth_content) @@ to_tsquery('english', %(tsq)s)
-ORDER BY ts_rank_cd(to_tsvector('english', ground_truth_content), to_tsquery('english', %(tsq)s)) DESC
+  AND s.v @@ s.tq
+ORDER BY ts_rank_cd(s.v, s.tq) DESC
 LIMIT %(k)s
 """
 
