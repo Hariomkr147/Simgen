@@ -10,6 +10,7 @@ import sys
 import tempfile
 
 from simgen import pipeline, retrieve
+from simgen.__main__ import load_env
 from simgen.retrieve import NCERTError, keywords, ncert_chunks
 
 FIXTURE = [  # (class_level, text) -- stand-ins shaped like knowledge_graph.graph_nodes rows
@@ -95,6 +96,7 @@ def test_blueprint_must_quote_source(tmp=None):
 
 
 def main():
+    load_env()   # NCERT_DSN / NCERT_SQL from .env
     test_keywords(); test_evidence_check()
     real = pipeline.grounding
     test_blueprint_must_quote_source(); pipeline.grounding = real
@@ -103,6 +105,7 @@ def main():
         import psycopg
         with psycopg.connect(dsn, connect_timeout=5) as c:
             n = c.execute("SELECT count(*), count(ground_truth_content) FROM knowledge_graph.graph_nodes").fetchone()
+        print("query:", "NCERT_SQL from .env (delete that line to use the built-in one)" if os.getenv("NCERT_SQL") else "built-in DEFAULT_SQL")
         print(f"LIVE DB: {n[0]} graph nodes, {n[1]} with content")
         topics = [l.strip() for l in open("topics.txt", encoding="utf-8") if l.strip() and not l.startswith("#")][:15]
         miss = 0
