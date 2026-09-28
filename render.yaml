@@ -8,7 +8,11 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120
+    # ponytail: 300s, not 120s -- teacher_student can chain a blueprint call + a
+    # student build + an optional judge call in one request; 120s clipped that.
+    # Ceiling, not a fix for unbounded latency: raise further, or split judging
+    # into its own request, if real traffic still times out at 300s.
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12

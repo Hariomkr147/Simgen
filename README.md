@@ -111,7 +111,7 @@ dashboard's Environment tab afterwards.
 
 ```
 Build command: pip install -r requirements.txt
-Start command: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120
+Start command: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300
 ```
 
 then add every var from `.env.example` under Environment (real values, not the
@@ -126,9 +126,16 @@ Notes:
 - Render's free-tier disk is ephemeral: files written to `runs/` and
   `Best Sim/` while the app is live are lost on redeploy/restart. Fine for a
   prototype; add a persistent disk (Render paid plans) if runs need to survive.
-- The `--timeout 120` on the start command matters: a real model call can take
-  30s–2min, and gunicorn's default 30s worker timeout would kill the request
-  mid-generation.
+- The `--timeout 300` on the start command matters: `teacher_student` mode
+  can chain a blueprint call + a student build + an optional judge call in
+  *one* request, and picking multiple modes at once chains even more — each
+  call alone can take 30s–2min. Too low a timeout kills the worker mid-call
+  (`WORKER TIMEOUT` in the logs, seen as an Internal Server Error) even
+  though the generation itself would've finished fine. If you still hit
+  this on real traffic, raise it further or turn `JUDGE_ENABLED` off.
+  **If you already created the service manually, updating this repo alone
+  won't change it** — the Start Command you typed into Render's dashboard
+  is what actually runs; update it there too (Settings → Start Command).
 - This repo ships the app only, not a pre-built library: `runs/`, `blueprints/`
   and `Best Sim/` are all excluded (see `.gitignore`). A fresh deploy starts
   with empty "Blueprints" and "Library" sections -- visitors generate and view
