@@ -537,7 +537,7 @@ function finishGuide(){
   if(TH.length)$("fThink").onclick=()=>{closeSheet();showTab("think");};
 }
 function renderFree(){
-  $("coachIcon").textContent="QUIZ";$("gDots").hidden=true;
+  $("coachIcon").textContent="FREE";$("gDots").hidden=true;
   $("gStep").textContent=step<N?`Challenge · ${step} of ${N} steps done`:"Challenge complete";
   $("gDo").innerHTML=step<N?"Do it yourself. Tap the steps in the right order.":"Great! You did every step. Try another option, or go to <b>Think</b>.";
 }

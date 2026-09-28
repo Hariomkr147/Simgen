@@ -10,7 +10,6 @@ cost/model metadata scans can't recover.
 import html
 import json
 import os
-import shutil
 import time
 from pathlib import Path
 from urllib.parse import urlencode
@@ -27,7 +26,6 @@ app = Flask(__name__)
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "").strip()
 RUNS = Path("runs")
 LOG = RUNS / "library.jsonl"
-BEST_DIR = Path("Best Sim")   # "Save best" button copies chosen sims here
 
 MODE_LABEL = {"teacher_only": "teacher only", "student_only": "student only",
               "teacher_student": "teacher -> student", "blueprint": "blueprint only"}
@@ -107,9 +105,9 @@ iframe{width:100%;height:620px;border:0;display:block;background:#fff}
           border-radius:var(--radius);padding:.9rem 1rem}
 .lib-card:hover{border-color:var(--accent)}
 .lib-card-link{display:block;text-decoration:none;color:inherit}
-.save-best{display:inline-block;margin-top:.55rem;font-size:.75rem;color:var(--accent);
+.download-link{display:inline-block;margin-top:.55rem;font-size:.75rem;color:var(--accent);
            text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:.2rem .5rem}
-.save-best:hover{border-color:var(--accent)}
+.download-link:hover{border-color:var(--accent)}
 .lib-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem}
 .lib-when{font-size:.72rem;color:var(--ink-dim)}
 .lib-card h4{margin:0 0 .4rem;font-family:var(--serif);font-size:.98rem;font-weight:600;
@@ -299,10 +297,45 @@ def log_run(entry):
         f.write(json.dumps(entry) + "\n")
 
 
-def load_meta():
-    """slug -> {file stem: logged entry}. Older entries have no "file" and their html was
-    saved as <mode>.html, so they key by mode."""
+def load_report_meta():
+    """slug -> {file stem: entry}, read from runs/<slug>/report__*.json -- written by the CLI
+    (`python -m simgen`), which never touches library.jsonl. Without this, a CLI-generated sim
+    picked up by the library scan shows no cost or model (library.jsonl is the only place those
+    normally come from)."""
     meta = {}
+    for p in RUNS.glob("*/report__*.json"):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        run_slug = p.parent.name
+        for row in data.get("rows", []):
+            stem = Path(row.get("file", "")).stem
+            if not stem:
+                continue
+            calls = row.get("calls") or []
+            checks = row.get("checks") or {}
+            teacher = next((c.get("model") for c in calls if c.get("role") == "teacher"), None)
+            student = next((c.get("model") for c in calls if c.get("role") == "student"), None)
+            meta.setdefault(run_slug, {})[stem] = {
+                "slug": run_slug, "mode": row.get("mode"), "file": stem,
+                "topic": data.get("topic"), "grade": data.get("grade"),
+                "teacher": teacher.partition(":")[0] if teacher else None,
+                "student": student.partition(":")[0] if student else None,
+                "cost_usd": row.get("cost_usd"), "seconds": row.get("seconds"),
+                "checks_passed": sum(checks.values()), "checks_total": len(checks),
+                "models": calls, "confidence_pct": pipeline.confidence_pct(row.get("judge")),
+                "judge": row.get("judge"),
+            }
+    return meta
+
+
+def load_meta():
+    """slug -> {file stem: logged entry}: CLI report files first, then library.jsonl (this
+    app's own /run calls) layered on top since it's the more complete, authoritative source
+    when both exist. Older library.jsonl entries have no "file" and their html was saved as
+    <mode>.html, so they key by mode."""
+    meta = load_report_meta()
     if LOG.exists():
         for line in LOG.read_text(encoding="utf-8").splitlines():
             try:
@@ -313,9 +346,9 @@ def load_meta():
     return meta
 
 
-def save_best_link(run_slug, name, text="save best"):
-    return (f'<a class="save-best" href="/save-best/{run_slug}/{name}" target="_blank" '
-            f'title="Copy this file into the Best Sim folder">&#128190; {text}</a>')
+def download_link(run_slug, name, text="download"):
+    return (f'<a class="download-link" href="/download/{run_slug}/{name}" '
+            f'title="Download this simulation as an HTML file">&#8681; {text}</a>')
 
 
 def library_items(limit=60):
@@ -368,7 +401,7 @@ def render_library():
             <div class="lib-meta"><span class="stat" title="{split}">{cost}</span><span>{checks} checks</span>
               {confidence_badge(it["confidence"], it["verdict"])}</div>
           </a>
-          {save_best_link(it['slug'], it['name'])}
+          {download_link(it['slug'], it['name'])}
         </div>''')
     return f'<div class="lib-grid">{"".join(cards)}</div>', len(items)
 
@@ -562,19 +595,17 @@ def blueprint_json(name):
     return Response(f.read_text(encoding="utf-8"), mimetype="application/json")
 
 
-@app.get("/save-best/<run_slug>/<name>")
-def save_best(run_slug, name):
-    """Copy a library simulation into Best Sim/ next to the project, for keeping the ones
-    worth showing off separate from the full generated library."""
+@app.get("/download/<run_slug>/<name>")
+def download(run_slug, name):
+    """Send a library simulation to the browser as a file download -- a server-side copy
+    (the old "save best" button) is useless on Render, where the disk is ephemeral and the
+    visitor can't reach it anyway; the file itself is what's worth keeping."""
     src = RUNS / run_slug / f"{name}.html"
     if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not src.exists():
         return "not found", 404
-    BEST_DIR.mkdir(exist_ok=True)
-    dest = BEST_DIR / f"{run_slug}__{name}.html"
-    shutil.copy(src, dest)
-    return (f'<!doctype html><meta charset="utf-8"><body style="font:15px sans-serif;padding:2rem">'
-            f'Saved to <code>{html.escape(str(dest.resolve()))}</code>'
-            f'<script>setTimeout(()=>close(),1200)</script>')
+    resp = Response(src.read_bytes(), mimetype="text/html")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{run_slug}__{name}.html"'
+    return resp
 
 
 STYLE = PAGE[PAGE.index("<style>"):PAGE.index("</style>") + len("</style>")]
@@ -683,7 +714,7 @@ def view(run_slug, name):
   {split}
   <iframe src="/sim/{run_slug}/{name}" style="height:78vh"></iframe>
   <div class="split"><a href="/sim/{run_slug}/{name}" target="_blank">open simulation alone</a>
-    {save_best_link(run_slug, name, "save to Best Sim")}</div>
+    {download_link(run_slug, name, "download HTML")}</div>
 </div>
 <div class="panel"><h2>Model calls</h2><div class="tbl-wrap"><table class="bp">
   <tr><th>Role</th><th>Model</th><th>Tokens in&rarr;out</th><th>Time</th><th>Cost</th><th>Billing</th></tr>
