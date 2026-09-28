@@ -508,10 +508,25 @@ def run():
     return resp
 
 
+def plan_facts(plan):
+    """(equations, step names, question count, one-line shape) for a Lab-app blueprint,
+    falling back to the older free-form schema so stored blueprints still display."""
+    eqs = (plan.get("science") or plan.get("physics") or {}).get("equations") or []
+    steps = [str(s.get("name", "")) for s in plan.get("steps") or [] if isinstance(s, dict)]
+    n_q = (sum(1 for s in plan.get("steps") or [] if isinstance(s, dict) and s.get("ask"))
+           + len(plan.get("think") or [])) or len(plan.get("questions") or [])
+    presets = len((plan.get("presets") or {}).get("options") or [])
+    if steps:
+        shape = f"Lab app · {len(steps)} steps · {presets} presets · {len(plan.get('controls') or [])} sliders · {n_q} questions"
+    else:
+        shape = f"older free-form blueprint · {len((plan.get('physics') or {}).get('parameters') or [])} parameters · {n_q} questions"
+    return eqs, steps, n_q, shape
+
+
 def render_blueprint_card(rec, fresh):
     plan = rec.get("plan", {})
-    eqs = (plan.get("physics") or {}).get("equations") or []
-    params = (plan.get("physics") or {}).get("parameters") or []
+    eqs, steps, _, shape = plan_facts(plan)
+    app_name = (plan.get("app") or {}).get("name")
     alias = str(rec.get("model", rec.get("teacher", ""))).partition(":")[0]
     return f'''<div class="card">
       <div class="card-head">
@@ -522,9 +537,10 @@ def render_blueprint_card(rec, fresh):
           <span class="stat">{rec.get("in_tokens", 0)}&rarr;{rec.get("out_tokens", 0)} tok</span>
           <span class="stat">{rec.get("seconds", 0)}s</span></div>
       </div>
-      <div class="bp-body"><b>{html.escape(str(plan.get("title", rec.get("topic", ""))))}</b><br>
+      <div class="bp-body"><b>{html.escape(str(app_name or plan.get("title", rec.get("topic", ""))))}</b><br>
+        {f'<span class="hint">{html.escape(" → ".join(steps))}</span><br>' if steps else ""}
         {" ".join(f"<code>{html.escape(str(e))}</code>" for e in eqs[:4])}<br>
-        <span class="hint">{len(params)} parameters · {len(plan.get("questions") or [])} questions ·
+        <span class="hint">{html.escape(shape)} ·
         {"NCERT-grounded" if rec.get("rag") else "ungrounded"} ·
         <a href="/blueprint/{html.escape(rec.get("file", ""))}" target="_blank">full JSON</a></span></div>
     </div>'''
@@ -598,16 +614,18 @@ def view(run_slug, name):
         if bpf and bpf.exists():
             rec = pipeline.read_blueprint(bpf)
             plan = rec.get("plan", {})
-            eqs = (plan.get("physics") or {}).get("equations") or []
+            eqs, steps, n_q, shape = plan_facts(plan)
             bp_html = f"""<div class="panel"><h2>Blueprint used</h2><div class="tbl-wrap"><table class="bp">
-              {detail_row("Title", html.escape(str(plan.get("title", ""))))}
+              {detail_row("Title", html.escape(str((plan.get("app") or {}).get("name") or plan.get("title", ""))))}
+              {detail_row("Shape", html.escape(shape))}
+              {detail_row("Steps", html.escape(" → ".join(steps)) or "-")}
               {detail_row("Teacher", f'<span class="model-tag">T-{html.escape(str(rec.get("teacher")))}</span> <span class="hint">{html.escape(str(rec.get("model", "")).partition(":")[2])}</span>')}
               {detail_row("Created", html.escape(rec.get("created", "")))}
               {detail_row("Blueprint cost", f'{money(rec.get("cost_usd"))} <span class="hint">({rec.get("in_tokens", 0)}&rarr;{rec.get("out_tokens", 0)} tokens, {rec.get("seconds", 0)}s)</span>')}
               {detail_row("This run", "reused a stored blueprint (not paid again)" if e.get("blueprint_reused") else "generated in this run")}
               {detail_row("Grounding", "NCERT-grounded" if rec.get("rag") else "ungrounded")}
               {detail_row("Equations", " ".join(f"<code>{html.escape(str(x))}</code>" for x in eqs) or "-")}
-              {detail_row("Questions", len(plan.get("questions") or []))}
+              {detail_row("Questions", n_q)}
               {detail_row("File", f'<a href="/blueprint/{html.escape(rec["file"])}" target="_blank">{html.escape(rec["file"])}.json</a>')}
             </table></div></div>"""
         else:

@@ -15,18 +15,8 @@ os.environ.update({
     "MODEL_fakeS_ID": "google/gemini-3.8-flash", "MODEL_fakeS_IN": "0.75", "MODEL_fakeS_OUT": "3.75",
 })
 
-from simgen import llm                      # noqa: E402
+from simgen import llm, pipeline            # noqa: E402
 from simgen.__main__ import main            # noqa: E402
-
-HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sim</title>
-<style>body{font-family:system-ui;margin:2rem}</style></head><body>
-<h1>Simple Pendulum</h1><canvas id="c" width="480" height="320"></canvas>
-<label>Length L (m) <input type="range" id="L" min="0.2" max="2" step="0.05" value="1"></label>
-<p>T = 2&pi;&radic;(L/g) &nbsp; <span id="T"></span></p>
-<h2>What to observe</h2><p>Does mass change the period? Why is T independent of amplitude for small angles? What happens if L doubles?</p>
-<button onclick="a.hidden=!a.hidden">Reveal</button><div id="a" hidden>No; small-angle approximation; T grows by &radic;2.</div>
-<script>const g=9.81;setInterval(()=>{T.textContent=(2*Math.PI*Math.sqrt(L.value/g)).toFixed(2)+' s'},100)</script>
-</body></html>"""
 
 PLAN = {"title": "Simple Pendulum", "grade": 9, "subject": "Physics",
         "ncert_refs": ["Class 9 Science, Ch. 8 Motion"],
@@ -37,7 +27,7 @@ PLAN = {"title": "Simple Pendulum", "grade": 9, "subject": "Physics",
 
 
 def fake(alias, system, user, max_tokens=0):
-    body = json.dumps(PLAN) if "JSON shape" in user else "```html\n" + HTML + "\n```"
+    body = json.dumps(PLAN) if "JSON shape" in user else "```js\n" + pipeline.EXAMPLE_TOPIC + "\n```"
     if "examiner" in system:
         body = json.dumps({"scientific_accuracy": 5, "ncert_alignment": 4, "interactivity": 4,
                            "grade_appropriateness": 5, "pedagogy": 4, "verdict": "solid"})

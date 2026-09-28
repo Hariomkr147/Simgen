@@ -9,6 +9,29 @@ cost/quality report comparing three routes to it.
 | `student_only` | small model writes the whole sim | cost floor + quality floor |
 | `teacher_student` | frontier model writes a JSON blueprint, small model implements it | the actual proposal |
 
+## Simulation format: the Lab app
+
+Every simulation comes out as the same "Lab app" (modelled on a hand-built Ester Lab):
+a **Play** tab with a Guide/Challenge coach, an animated canvas under a 4-value HUD,
+preset chips (e.g. reactant pairs, planets), optional sliders, and 3–6 ordered step
+buttons with a question after each step in Guide mode; a **Think** tab with 3 questions;
+a **?** key-words sheet; phone and dark layouts.
+
+That shell is fixed code in `simgen/shell.html`. Models never write it — they write
+only the **TOPIC script** (the science, steps, questions and canvas drawing), which
+`pipeline.assemble()` splices into the shell. So every output looks the same, and the
+builder outputs a few thousand tokens instead of a whole page. The API the topic script
+fills is `TOPIC_CONTRACT` in `simgen/pipeline.py`; the builder prompt includes two
+complete examples: the shell's own Pendulum Lab (an experiment) and
+`simgen/example_ester.js` (a mechanism). Open `simgen/shell.html` in a browser to see
+the format working. A topic script that fails to load or throws shows its error in the
+coach bar rather than a blank page.
+
+The teacher's blueprint (`PLAN_SCHEMA`) is shaped for this: app name/colour, science
+(equations, constants, update rule), presets with their data, sliders, the 4 HUD values,
+the stage layout, and each step's action, animation, banner and question. Blueprints
+carry `"schema": 2`; older free-form ones stay listed but are never reused.
+
 ## Quickstart
 
 ```bash
@@ -92,7 +115,9 @@ text), `%(grade)s`, `%(k)s`. Leave `NCERT_DSN` empty to run ungrounded.
 ## Checks
 
 `static_checks()` gates every output with no model call: is it HTML, has a canvas/SVG,
-has controls, has script, **makes zero network requests**, has questions, plausible size.
+has controls, has script, **makes zero network requests**, has questions, plausible size,
+and `lab_shell`: it's a Lab app whose topic script declares `APP`, `STEPS` and `draw`
+and actually replaced the shell's example.
 `--judge` adds a rubric-scored LLM grade (/25) at the cost of one extra call per output.
 Static checks are the gate; the judge is a signal, not a verdict.
 

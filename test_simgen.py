@@ -24,6 +24,7 @@ GOOD = """<!DOCTYPE html><html><head><style>body{}</style></head><body>
 <!--PADDING""" + "p" * 3000 + """--></body></html>"""
 
 PLAN = {"title": "Pendulum", "grade": 9, "physics": {"equations": ["T=2*pi*sqrt(L/g)"]}}
+TOPIC = pipeline.EXAMPLE_TOPIC   # a complete, working TOPIC script (the shell's own example)
 
 
 def test_cost():
@@ -99,11 +100,28 @@ def test_extract_json():
 
 
 def test_static_checks():
-    c = pipeline.static_checks(GOOD)
+    c = pipeline.static_checks(pipeline.assemble(TOPIC))
     assert all(c.values()), [k for k, v in c.items() if not v]
+    assert not pipeline.static_checks(GOOD)["lab_shell"]          # free-form page, not a Lab app
+    assert not pipeline.static_checks(pipeline.SHELL)["lab_shell"]  # example never replaced
     bad = GOOD.replace("<script>", '<script src="https://cdn.example.com/x.js"></script><script>')
     assert not pipeline.static_checks(bad)["offline"]
     assert not pipeline.static_checks("just some text")["is_html"]
+
+
+def test_topic_spliced_into_shell():
+    page = pipeline.build_html("Here you go:\n```js\n" + TOPIC + "\n```\nDone.")
+    assert page.startswith("<!doctype html>") and pipeline.topic_of(page) == TOPIC
+    assert pipeline.EXAMPLE_SENTINEL not in page and "</html>" in page
+    assert pipeline.build_html(TOPIC) == page                      # bare, unfenced topic
+    assert pipeline.build_html("```html\n" + GOOD + "\n```") == GOOD  # whole document kept as-is
+    assert pipeline.build_html("sorry, I can't") == ""
+    evil = pipeline.assemble('const APP={name:"</script><b>x"};')
+    assert "</script><b>" not in evil and "<\\/script><b>" in evil  # can't close the shell's <script>
+    # the builder prompt carries the API and a worked example; the plan prompt keeps its marker
+    p = pipeline._build_prompt("Esterification", 12, "", PLAN)
+    assert "TOPIC script" in p and "const STEPS" in p and pipeline.EXAMPLE_SENTINEL not in p
+    assert "JSON shape" in pipeline._plan_prompt("Esterification", 12, "")
 
 
 def test_pipeline_modes_and_token_split():
@@ -112,7 +130,7 @@ def test_pipeline_modes_and_token_split():
 
     def fake(alias, system, user, max_tokens=0):
         seen.append(alias)
-        body = json.dumps(PLAN) if "JSON shape" in user else "```html\n" + GOOD + "\n```"
+        body = json.dumps(PLAN) if "JSON shape" in user else "```js\n" + TOPIC + "\n```"
         return body, len(user) // 4, len(body) // 4
 
     llm.TRANSPORT = fake
@@ -120,7 +138,7 @@ def test_pipeline_modes_and_token_split():
         html, plan, us = pipeline.run("teacher_student", "Pendulum", 9, "t", "s", use_rag=False)
         assert seen == ["t", "s"] and len(us) == 2 and plan["grade"] == 9
         assert [u.role for u in us] == ["teacher", "student"]
-        assert html.startswith("<!DOCTYPE")
+        assert pipeline.static_checks(html)["lab_shell"]
         cheap = sum(u.cost_usd for u in us)
 
         seen.clear()
