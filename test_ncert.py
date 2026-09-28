@@ -51,10 +51,18 @@ def _db_tests(dsn):
     assert any("pendulum" in r for r in ncert_chunks("Class 9 Science: Simple Pendulum Motion", 9, dsn=dsn)), "OR top-up"
     with psycopg.connect(dsn, autocommit=True) as c:      # heading match must beat a passing mention
         for t in ("## 8.2 Cells\nCells are studied in detail. Osmosis and diffusion diffusion diffusion osmosis osmosis are mentioned here.",
-                  "## 8.5 Osmosis and Diffusion\nWater moves across a membrane."):
+                  "## 8.5 Osmosis and Diffusion\nWater moves across a semipermeable membrane from higher to lower water potential."):
             c.execute("INSERT INTO knowledge_graph.graph_nodes (class_level, ground_truth_content) VALUES (11, %s)", (t,))
     top = ncert_chunks("Class 11 Biology: Osmosis and diffusion", 11, k=2, dsn=dsn)
     assert top[0].startswith("## 8.5 Osmosis"), top
+    with psycopg.connect(dsn, autocommit=True) as c:      # junk must not outrank real content
+        for t in ("![](page=0,bbox=[1, 2, 3, 4])\n\nFig. 9.1\n\n> [FIGURE_DESCRIPTION] cone volume cone cone cone",
+                  "## 11.5 Summary\nIn this chapter you studied cone volume, cone surface, cone cone cone cone cone cone cone cone cone cone.",
+                  "## 11.3 Volume of a Cone\nThe volume of a right circular cone is one third of the volume of a cylinder of the same base and height, V = (1/3) pi r squared h."):
+            c.execute("INSERT INTO knowledge_graph.graph_nodes (class_level, ground_truth_content) VALUES (9, %s)", (t,))
+    cone = ncert_chunks("Class 9 Maths: Volume of a cone", 9, k=3, dsn=dsn)
+    assert cone[0].startswith("## 11.3 Volume"), cone
+    assert not any(r.startswith("![](") for r in cone), cone
     assert ncert_chunks("Class 10 Science: Quantum Chromodynamics", 10, dsn=dsn) == []
 
     # strict grounding through the pipeline: asked for, not delivered -> error, never silently ungrounded

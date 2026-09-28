@@ -19,7 +19,11 @@ FROM knowledge_graph.graph_nodes,
 WHERE ground_truth_content IS NOT NULL
   AND (%(grade)s IS NULL OR class_level = %(grade)s)
   AND s.v @@ s.tq
-ORDER BY ts_rank_cd(s.v, s.tq) DESC
+  AND ground_truth_content NOT LIKE '![](%%'          -- bare figure stubs teach nothing
+  AND length(ground_truth_content) > 60
+ORDER BY ts_rank_cd(s.v, s.tq)
+         * CASE WHEN split_part(ground_truth_content, chr(10), 1) ~* '(summary|exercise|points to ponder)' THEN 0.3 ELSE 1 END
+         DESC
 LIMIT %(k)s
 """
 
