@@ -22,10 +22,18 @@ def ncert_context(topic, grade=None, k=None):
     k = k or int(os.getenv("NCERT_TOP_K", "6"))
     sql = os.getenv("NCERT_SQL", DEFAULT_SQL)
     try:
-        with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        with psycopg.connect(dsn, connect_timeout=5) as conn, conn.cursor() as cur:
             cur.execute(sql, {"q": topic, "grade": grade, "k": k})
             rows = [r[0] for r in cur.fetchall()]
         return "\n\n---\n\n".join(rows)
+    except psycopg.OperationalError as e:
+        # ponytail: DB unreachable (wrong/stale NCERT_DSN, no network path from
+        # this host) -- degrade to ungrounded instead of failing the whole
+        # generation. Same fallback an unset NCERT_DSN already gets; a bad one
+        # shouldn't be worse. Upgrade path: retry/circuit-break if this fires
+        # often enough that silently-ungrounded runs become a problem.
+        print(f"NCERT grounding skipped, DB unreachable: {e}")
+        return ""
     except psycopg.errors.UndefinedTable:
         # We guessed a table name (ncert_chunks); your DB uses something else.
         # Rather than guess further, hand back what's actually there so NCERT_SQL
