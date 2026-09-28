@@ -72,6 +72,7 @@ p{margin:0}
 .dots i{width:16px;height:5px;border-radius:3px;background:var(--chip)}
 .dots i.on{background:var(--accent)} .dots i.done{background:var(--gold)}
 .coach-do{font-size:15px}
+.btn.play{padding:6px 12px;min-height:0;font-size:13px;border-radius:10px;flex:none;white-space:nowrap}
 .mode{display:inline-grid;grid-auto-flow:column;gap:2px;padding:3px;background:var(--chip);border-radius:10px;flex:none}
 .mode button{border:0;background:transparent;border-radius:8px;padding:6px 10px;font-size:13px}
 .mode button[aria-pressed="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -218,6 +219,7 @@ input[type=range]:disabled{opacity:.5}
           <div class="coach-top"><span class="pill" id="gStep"></span><span class="dots" id="gDots"></span></div>
           <p class="coach-do" id="gDo"></p>
         </div>
+        <button class="btn play" id="bPlay" aria-label="Start automatic walkthrough">▶ Start</button>
         <div class="mode" role="group" aria-label="Mode">
           <button id="modeGuided" aria-pressed="true">Guide</button>
           <button id="modeFree" aria-pressed="false">Challenge</button>
@@ -465,9 +467,9 @@ function updateHud(){const v=safe("readouts")||[];for(let i=0;i<4;i++){const s=v
 
 /* ---------- Mechanics ---------- */
 function durOf(i){const d=STEPSC[i].dur,v=typeof d==="function"?get(d):d;return clamp(+v||2.3,.3,30);}
-function resetMech(){step=0;anim=null;__banner=null;safe("resetSim");updateActs();if(guided)renderGuide();else renderFree();}
+function resetMech(){auto=false;paused=false;playLabel();step=0;anim=null;__banner=null;safe("resetSim");updateActs();if(guided)renderGuide();else renderFree();}
 function tryAct(i){
-  if(anim||step>=N||asking)return;
+  if(anim||step>=N||asking||paused)return;
   const btn=ab.children[i];
   if(i!==step){btn.classList.remove("wrong");void btn.offsetWidth;btn.classList.add("wrong");setTimeout(()=>btn.classList.remove("wrong"),650);
     banner(i<step?"Already done!":"Not yet. What must happen first?",true,1.8);return;}
@@ -486,7 +488,7 @@ function stepSim(dt){
     const i=anim.i;step=i+1;anim=null;updateActs();
     banner(STEPSC[i].result||"Done",false,2);
     if(step===N)banner(CFG.finish.banner||CFG.finish.title||"Complete!",false,2.6);
-    setTimeout(()=>guideEvent(i+1),700);
+    setTimeout(()=>guideEvent(i+1),700);autoAt=performance.now()+1000;
     if(!guided)renderFree();
   }
 }
@@ -507,7 +509,7 @@ function frame(){
 }
 
 /* ---------- Guide / Challenge ---------- */
-let guided=true,asking=false;
+let guided=true,asking=false,auto=false,paused=false,autoAt=0;
 function clearHL(){document.querySelectorAll(".ctrl").forEach(c=>c.classList.remove("hl"));}
 function renderGuide(){
   $("coachIcon").textContent="GUIDE";if(step>=N)return;
@@ -524,7 +526,7 @@ function guideEvent(done){
   asking=true;updateActs();
   openSheet(`Guide asks · Step ${done}`,q.q,optsHTML(q,"g-"+done),`<button class="btn" id="gNext" disabled>${last?"Finish":"Next step →"}</button>`);
   $("sheetBody").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{markQ($("sheetBody"),q);$("gNext").disabled=false;});
-  $("gNext").onclick=()=>{asking=false;closeSheet();if(last)finishGuide();else renderGuide();};
+  $("gNext").onclick=()=>{asking=false;autoAt=performance.now()+500;closeSheet();if(last)finishGuide();else renderGuide();};
 }
 function finishGuide(){
   clearHL();updateActs();
@@ -546,11 +548,20 @@ function setMode(g){
   $("modeGuided").setAttribute("aria-pressed",g);$("modeFree").setAttribute("aria-pressed",!g);
   clearHL();resetMech();
 }
+function playLabel(){const b=$("bPlay");b.textContent=!auto?"▶ Start":paused?"▶ Resume":"⏸ Pause";
+  b.setAttribute("aria-label",!auto?"Start automatic walkthrough":paused?"Resume":"Pause");}
+$("bPlay").onclick=()=>{
+  if(!auto){if(step>=N)resetMech();auto=true;paused=false;autoAt=0;}
+  else paused=!paused;
+  playLabel();};
 $("modeGuided").onclick=()=>setMode(true);$("modeFree").onclick=()=>setMode(false);
 
 /* ---------- Loop ---------- */
 let last=performance.now();
-function loop(now){const dt=Math.min(.033,(now-last)/1000);last=now;stepSim(dt);if(!$("scrPlay").hidden){frame();updateHud();}requestAnimationFrame(loop);}
+function loop(now){const dt=Math.min(.033,(now-last)/1000);last=now;
+  if(auto&&!paused&&!anim&&!asking&&step<N&&now>=autoAt)tryAct(step);
+  if(auto&&step>=N&&!anim){auto=false;paused=false;playLabel();}
+  if(!paused)stepSim(dt);if(!$("scrPlay").hidden){frame();updateHud();}requestAnimationFrame(loop);}
 resize();setMode(true);requestAnimationFrame(loop);
 window.__lab={get step(){return step;},get anim(){return anim;},N,tryAct};   // for automated checks
 })();

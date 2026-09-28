@@ -7,7 +7,7 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 
-NAMES = {"opus55": "Claude Opus 5.5", "opus5": "Claude Opus 5", "fable51": "Claude Fable 5.1",
+NAMES = {"sonnet55": "Claude Sonnet 5.5", "opus55": "Claude Opus 5.5", "opus5": "Claude Opus 5", "fable51": "Claude Fable 5.1",
          "astra6": "GPT-6 Astra", "sol6": "GPT-6 Sol", "glm53": "GLM 5.3",
          "gemini38flash": "Gemini 3.8 Flash", "gemini31flashlite": "Gemini 3.1 Flash-Lite",
          "gemini35flashlite": "Gemini 3.5 Flash-Lite", "glm53flash": "GLM 5.3 Flash",
