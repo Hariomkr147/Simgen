@@ -39,31 +39,36 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <title>simgen</title>
 <style>
 :root{
-  --bg:#f6f4ee; --surface:#ffffff; --surface-2:#efebe0; --ink:#1f2420; --ink-dim:#656e64;
-  --border:#ddd6c4; --accent:#2f6f66; --accent-ink:#ffffff;
-  --teacher:#a5690f; --student:#2f6f66; --hybrid:#5850c9;
-  --good:#2f7a4f; --bad:#b23b2e; --radius:12px;
-  --serif:ui-serif,Georgia,"Times New Roman",serif;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
-  --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
+  --bg:#f1edf5; --surface:#ffffff; --surface-2:#f0ebf6; --ink:#1d1a26; --ink-dim:#5f5a6e;
+  --border:#ddd6e6; --accent:#b0226b; --accent-ink:#ffffff;
+  --teacher:#a5690f; --student:#5850c9; --hybrid:#7a3fd1;
+  --good:#0e7a3c; --good-soft:#dcefe2; --bad:#b93838; --bad-soft:#f8e3e3; --radius:16px;
+  --shadow:0 6px 24px rgba(16,40,24,.10);
+  --serif:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --sans:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --mono:"Chakra Petch",ui-monospace,"Cascadia Code",Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#14181a; --surface:#1b2022; --surface-2:#222829; --ink:#eef1ec; --ink-dim:#98a19b;
-  --border:#2b3234; --accent:#5db8a8; --accent-ink:#0d1211;
-  --teacher:#d9a441; --student:#5db8a8; --hybrid:#9089ef;
-  --good:#4fbd7c; --bad:#e2685a; color-scheme:dark;
+  --bg:#15121b; --surface:#1f1a28; --surface-2:#2a2334; --ink:#ece8f2; --ink-dim:#a8a1b8;
+  --border:#342c40; --accent-ink:#1a0710;
+  --teacher:#d9a441; --student:#9089ef; --hybrid:#9089ef;
+  --good:#5cc88a; --good-soft:#15301f; --bad:#ff8080; --bad-soft:#3a1a1c;
+  --shadow:0 6px 24px rgba(0,0,0,.35); color-scheme:dark;
 }}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
      padding:2.5rem 1rem 4rem;min-height:100vh}
 .wrap{max-width:980px;margin:0 auto}
-header{margin-bottom:2rem}
+header{margin-bottom:2rem;display:flex;align-items:center;gap:.9rem}
+.logo{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;
+      background:linear-gradient(160deg,var(--accent),var(--hybrid));color:#fff;
+      font-family:var(--serif);font-weight:800;font-size:18px}
 header h1{font-family:var(--serif);font-size:2rem;font-weight:600;margin:0 0 .2rem;
           letter-spacing:-.01em}
 header p{margin:0;color:var(--ink-dim);font-size:.95rem}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-       padding:1.5rem;margin-bottom:1.75rem}
+       box-shadow:var(--shadow);padding:1.5rem;margin-bottom:1.75rem}
 .panel h2{font-family:var(--serif);font-size:1.05rem;font-weight:600;margin:0 0 1rem}
 form{display:grid;gap:1rem}
 .row{display:grid;grid-template-columns:2fr 1fr;gap:1rem}
@@ -71,28 +76,30 @@ form{display:grid;gap:1rem}
 @media (max-width:640px){.row,.row3{grid-template-columns:1fr}}
 .field{display:flex;flex-direction:column;gap:.35rem}
 label{font-size:.78rem;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.04em}
-input,select{padding:.6rem .7rem;border-radius:8px;border:1px solid var(--border);
+input,select{padding:.6rem .7rem;border-radius:12px;border:1.5px solid var(--border);
              background:var(--bg);color:var(--ink);font:inherit;font-size:.92rem}
-input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+input:focus,select:focus{outline:3px solid var(--accent);outline-offset:1px}
 fieldset{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:.5rem 1.25rem}
 fieldset label{text-transform:none;font-size:.88rem;color:var(--ink);display:flex;
                 align-items:center;gap:.4rem;letter-spacing:0}
 .actions{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
 .hint{font-size:.8rem;color:var(--ink-dim)}
-button{padding:.7rem 1.4rem;border-radius:8px;border:0;background:var(--accent);
-       color:var(--accent-ink);font-weight:600;font-size:.92rem;cursor:pointer}
+button{padding:.7rem 1.4rem;border-radius:12px;border:0;background:var(--accent);
+       color:var(--accent-ink);font-weight:700;font-size:.92rem;cursor:pointer}
 button:hover{opacity:.9}
 .buttons{display:flex;gap:.6rem;flex-wrap:wrap}
-.badge{display:inline-block;padding:.15rem .55rem;border-radius:99px;font-size:.72rem;
-       font-weight:600;letter-spacing:.02em;color:#fff}
+.badge{display:inline-block;padding:.15rem .6rem;border-radius:99px;font-size:.72rem;
+       font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#fff}
 .badge-t{background:var(--teacher)}.badge-s{background:var(--student)}.badge-ts{background:var(--hybrid)}
 .stat{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-      margin-bottom:1.25rem;overflow:hidden}
+      box-shadow:var(--shadow);margin-bottom:1.25rem;overflow:hidden}
 .card-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;
            padding:.85rem 1.1rem;background:var(--surface-2);flex-wrap:wrap}
 .card-head .stats{display:flex;gap:1rem;font-size:.85rem;color:var(--ink-dim)}
-.checks-ok{color:var(--good);font-weight:600}.checks-bad{color:var(--bad);font-weight:600}
+.checks-ok,.checks-bad{font-weight:700;border-radius:99px;padding:.1rem .55rem;font-size:.78rem}
+.checks-ok{color:var(--good);background:var(--good-soft)}
+.checks-bad{color:var(--bad);background:var(--bad-soft)}
 .err{padding:1rem 1.1rem;color:var(--bad);font-size:.9rem}
 iframe{width:100%;height:620px;border:0;display:block;background:#fff}
 .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.9rem}
@@ -129,8 +136,9 @@ table.bp a{color:var(--accent)}
       color:var(--ink-dim);white-space:nowrap}
 </style></head><body><div class="wrap">
 <header>
-  <h1>simgen</h1>
-  <p>NCERT topic → interactive simulation. Teacher plans, student builds, every run priced in &#8377; (1 USD = &#8377;@@RATE@@). <a href="/costs" style="color:var(--accent);font-weight:600">Cost table &rarr;</a></p>
+  <span class="logo" aria-hidden="true">S</span>
+  <div><h1>simgen</h1>
+  <p>NCERT topic → interactive simulation. Teacher plans, student builds, every run priced in &#8377; (1 USD = &#8377;@@RATE@@). <a href="/costs" style="color:var(--accent);font-weight:600">Cost table &rarr;</a></p></div>
 </header>
 
 <div class="panel">

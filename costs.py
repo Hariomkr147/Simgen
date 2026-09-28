@@ -16,27 +16,29 @@ NAMES = {"opus55": "Claude Opus 5.5", "opus5": "Claude Opus 5", "fable51": "Clau
          "grok47": "Grok 4.7", "qwen38max": "Qwen 3.8 Max", "mimo26pro": "MiMo V2.6 Pro", "musespark13c": "Muse Spark 1.3", "gemini37flash": "Gemini 3.7 Flash", "hy4preview": "Hy4 Preview (Tencent)"}
 
 STYLE = """<style>
-:root{--bg:#f6f7f6;--surface:#ffffff;--ink:#1b2320;--muted:#5f6b66;--rule:#dde3e0;
-  --band:#e9f1ed;--accent:#1d6b58;--ok:#23734a;--bad:#b0392c;--low:#23734a;--high:#9a5a12;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121715;--surface:#18201d;
-  --ink:#e5ece8;--muted:#96a49d;--rule:#2a3531;--band:#1d2a25;--accent:#62c8a9;--ok:#5fcf93;
-  --bad:#f0806f;--low:#5fcf93;--high:#e3a55a;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#121715;--surface:#18201d;--ink:#e5ece8;--muted:#96a49d;--rule:#2a3531;
-  --band:#1d2a25;--accent:#62c8a9;--ok:#5fcf93;--bad:#f0806f;--low:#5fcf93;--high:#e3a55a;color-scheme:dark}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif;
+:root{--bg:#f1edf5;--surface:#ffffff;--ink:#1d1a26;--muted:#5f5a6e;--rule:#ddd6e6;
+  --band:#f0ebf6;--accent:#b0226b;--ok:#0e7a3c;--bad:#b93838;--low:#0e7a3c;--high:#9a6c00;
+  --shadow:0 6px 24px rgba(16,40,24,.10);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15121b;--surface:#1f1a28;
+  --ink:#ece8f2;--muted:#a8a1b8;--rule:#342c40;--band:#2a2334;--ok:#5cc88a;
+  --bad:#ff8080;--low:#5cc88a;--high:#f5b301;--shadow:0 6px 24px rgba(0,0,0,.35);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15121b;--surface:#1f1a28;--ink:#ece8f2;--muted:#a8a1b8;--rule:#342c40;
+  --band:#2a2334;--ok:#5cc88a;--bad:#ff8080;--low:#5cc88a;--high:#f5b301;
+  --shadow:0 6px 24px rgba(0,0,0,.35);color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
   padding-inline:16px;padding-block:32px 48px}
 .wrap{max-width:960px;margin:0 auto;display:grid;gap:28px}
-h1{font-size:26px;font-weight:600;margin:0;text-wrap:balance}
+h1{font-family:"Baloo 2","Trebuchet MS",system-ui,sans-serif;font-size:26px;font-weight:600;margin:0;text-wrap:balance}
 .intro{color:var(--muted);margin:6px 0 0;max-width:72ch}
 .intro strong{color:var(--ink)}
 h2{font-size:17px;font-weight:600;margin:0;text-wrap:balance}
 .sub{color:var(--muted);font-size:13px;margin:2px 0 10px}
-.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:8px}
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:16px;box-shadow:var(--shadow)}
 table{width:100%;border-collapse:collapse;min-width:640px}
 th{text-align:left;font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
   color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--rule)}
 td{padding:9px 12px;border-top:1px solid var(--rule)}
-.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+.num{font-family:"Chakra Petch",ui-monospace,"Cascadia Code",monospace;font-variant-numeric:tabular-nums;
   text-align:right;white-space:nowrap}
 tr.bp td{background:var(--band);font-size:14px}
 tr.bp .num{text-align:left;margin-inline:6px;font-weight:500}
@@ -50,16 +52,13 @@ tr.bp .num{text-align:left;margin-inline:6px;font-weight:500}
 a{color:var(--accent);font-weight:600}
 a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .open{display:flex;gap:8px;align-items:center;white-space:nowrap}
-button.copy{font:600 12px "IBM Plex Sans",system-ui,sans-serif;color:var(--accent);background:transparent;
-  border:1px solid var(--rule);border-radius:6px;padding:3px 9px;cursor:pointer}
+button.copy{font:600 12px "Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;color:var(--accent);background:transparent;
+  border:1.5px solid var(--rule);border-radius:10px;padding:3px 9px;cursor:pointer}
 button.copy:hover{border-color:var(--accent)}
-code.url{font:12px "IBM Plex Mono",ui-monospace,monospace;background:var(--band);padding:2px 6px;
+code.url{font:12px "Chakra Petch",ui-monospace,"Cascadia Code",monospace;background:var(--band);padding:2px 6px;
   border-radius:4px;user-select:all;word-break:break-all}
 .note{color:var(--muted);font-size:13px;margin:0}
 </style>"""
-
-FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:'
-         'wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">')
 
 COPY_JS = """<script>
 document.addEventListener('click', function (ev) {
@@ -188,7 +187,7 @@ def page(runs_dir, bp_dir, rate, link_prefix="", exists=None, snapshot=False):
                "Chrome blocks links from a web page to your own computer, so Open may do nothing here.")
     else:
         how = '<a href="/">&larr; back to simgen</a>'
-    head = f"<title>Simgen Cost Table</title>{FONTS}{STYLE}"
+    head = f"<title>Simgen Cost Table</title>{STYLE}"
     body = f"""<div class="wrap"><header><h1>Simgen Cost Table</h1>
       <p class="intro">What each teacher_student simulation cost, and how confident an LLM judge is in its
       correctness. Each topic's blueprint is paid once, then every student build reuses it. Prices in rupees
