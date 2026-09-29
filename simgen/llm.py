@@ -22,6 +22,7 @@ class Usage:
     seconds: float
     cached_tokens: int = 0
     cost_source: str = "table"   # "reported" when the provider billed us a number
+    finish: str = ""             # provider finish_reason; "length" = reply was cut off
 
     dict = asdict
 
@@ -67,7 +68,7 @@ def call(alias, system, user, role="", max_tokens=32000, temperature=0.3, reason
     """Returns (text, Usage)."""
     spec = model_spec(alias)
     t0 = time.time()
-    reported, cached = None, 0
+    reported, cached, finish = None, 0, ""
 
     if TRANSPORT:
         out = TRANSPORT(alias, system, user, max_tokens=max_tokens)
@@ -87,6 +88,7 @@ def call(alias, system, user, role="", max_tokens=32000, temperature=0.3, reason
                       {"role": "user", "content": user}],
         )
         text = r.choices[0].message.content or ""
+        finish = r.choices[0].finish_reason or ""
         nin, nout = r.usage.prompt_tokens, r.usage.completion_tokens
         reported, cached = _usage_fields(r.usage)
 
@@ -94,4 +96,4 @@ def call(alias, system, user, role="", max_tokens=32000, temperature=0.3, reason
     cost = reported if reported is not None else cost_usd(spec, nin, nout)
     return text, Usage(role or alias, f"{alias}:{spec['id']}", nin, nout,
                        round(cost, 6), round(time.time() - t0, 2), cached,
-                       "reported" if reported is not None else "table")
+                       "reported" if reported is not None else "table", finish)

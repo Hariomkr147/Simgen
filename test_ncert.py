@@ -18,6 +18,7 @@ FIXTURE = [  # (class_level, text) -- stand-ins shaped like knowledge_graph.grap
          "the reflected ray and the normal at the point of incidence all lie in the same plane."),
     (10, "Light travels in a straight line. A plane mirror forms a virtual image of the same size."),
     (10, "Ohm's law: the potential difference across a conductor is directly proportional to the current."),
+    (10, "The motion of electrons through a conductor constitutes an electric current."),
     (9,  "A simple pendulum: the time period depends on the length of the string and on g, not on the mass."),
     (9,  "Sound needs a medium to travel. Reflection of sound is called an echo."),
 ]
@@ -48,7 +49,11 @@ def _db_tests(dsn):
     assert not any("echo" in r for r in ncert_chunks("Class 10 Science: Reflection of Light", 10, dsn=dsn)), "grade filter leaked class 9"
     assert any("echo" in r for r in ncert_chunks("Reflection of sound", 9, dsn=dsn))
     assert len(ncert_chunks("Class 10 Science: Reflection of Light", 10, k=1, dsn=dsn)) == 1
-    assert any("pendulum" in r for r in ncert_chunks("Class 9 Science: Simple Pendulum Motion", 9, dsn=dsn)), "OR top-up"
+    assert any("pendulum" in r for r in ncert_chunks("Class 9 Science: Simple Pendulum Motion", 9, dsn=dsn)), "drop-one fallback"
+    # a generic word alone must not pull in another topic (Projectile Motion -> Ohm's law was this bug)
+    assert ncert_chunks("Projectile Motion", 10, dsn=dsn) == [], ncert_chunks("Projectile Motion", 10, dsn=dsn)
+    # topic taught in another class than asked: grade filter falls back instead of failing
+    assert any("pendulum" in r for r in ncert_chunks("Simple Pendulum", 10, dsn=dsn))
     with psycopg.connect(dsn, autocommit=True) as c:      # heading match must beat a passing mention
         for t in ("## 8.2 Cells\nCells are studied in detail. Osmosis and diffusion diffusion diffusion osmosis osmosis are mentioned here.",
                   "## 8.5 Osmosis and Diffusion\nWater moves across a semipermeable membrane from higher to lower water potential."):
@@ -96,8 +101,8 @@ def test_blueprint_must_quote_source(tmp=None):
     """A teacher that ignores the source (no verifiable quotes) is retried once, then rejected."""
     from simgen import llm
     os.environ.update({"LLM_BASE_URL": "x", "LLM_API_KEY": "x", "MODEL_t_ID": "m", "MODEL_t_IN": "1", "MODEL_t_OUT": "1"})
-    plans = {"ungrounded": {"title": "T", "steps": [], "evidence": ["totally invented sentence"]},
-             "grounded": {"title": "T", "steps": [], "evidence": [FIXTURE[0][1].split(".")[0]]}}
+    plans = {"ungrounded": {"title": "Reflection of light", "steps": [], "evidence": ["totally invented sentence"]},
+             "grounded": {"title": "Reflection of light", "steps": [], "evidence": [FIXTURE[0][1].split(".")[0]]}}
     pipeline.grounding = lambda *a: FIXTURE[0][1]
     pipeline.BLUEPRINTS = __import__("pathlib").Path(tempfile.mkdtemp())
     for name, ok in (("ungrounded", False), ("grounded", True)):
@@ -137,7 +142,7 @@ def main():
             print("skip DB tests (no NCERT_DSN, no pgserver)"); return
         srv = pgserver.get_server(tempfile.mkdtemp())
         _db_tests(srv.get_uri())
-        print("ok fixture DB tests (retrieval, grade filter, OR top-up, strict errors)")
+        print("ok fixture DB tests (retrieval, grade filter + fallback, no off-topic matches, strict errors)")
     print("all passed")
 
 

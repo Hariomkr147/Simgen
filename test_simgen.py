@@ -199,31 +199,31 @@ def test_blueprint_stored_then_reused():
 
     llm.TRANSPORT = fake
     try:
-        rec, us = pipeline.blueprint("Rolling motion", 11, "t", use_rag=False)
+        rec, us = pipeline.blueprint("Simple Pendulum", 11, "t", use_rag=False)
         assert seen == ["t"] and len(us) == 1 and rec["cost_usd"] == 0.05 and rec["grade"] == 11
-        assert pipeline.load_blueprint("Rolling motion")["plan"] == PLAN
+        assert pipeline.load_blueprint("Simple Pendulum")["plan"] == PLAN
 
         seen.clear()
-        _, again = pipeline.blueprint("Rolling motion", 11, "t", use_rag=False)
+        _, again = pipeline.blueprint("Simple Pendulum", 11, "t", use_rag=False)
         assert seen == [] and again == []                       # served from store, no call
 
         seen.clear()
-        html, plan, us = pipeline.run("teacher_student", "Rolling motion", 11, "t", "s", use_rag=False)
+        html, plan, us = pipeline.run("teacher_student", "Simple Pendulum", 11, "t", "s", use_rag=False)
         assert seen == ["s"] and [u.role for u in us] == ["student"] and plan == PLAN
 
         seen.clear()
-        _, _, us = pipeline.run("teacher_student", "Rolling motion", 11, "t", "s", use_rag=False,
+        _, _, us = pipeline.run("teacher_student", "Simple Pendulum", 11, "t", "s", use_rag=False,
                                 reuse_blueprint=False)
         assert seen == ["t", "s"]                               # forced regeneration
-        assert len(pipeline.blueprint_files("Rolling motion")) == 2  # kept both, not overwritten
+        assert len(pipeline.blueprint_files("Simple Pendulum")) == 2  # kept both, not overwritten
 
         seen.clear()
         os.environ.update({"MODEL_t2_BASE_URL": "x", "MODEL_t2_API_KEY": "x", "MODEL_t2_ID": "t2",
                            "MODEL_t2_IN": "1", "MODEL_t2_OUT": "1"})
-        rec2, _ = pipeline.blueprint("Rolling motion", 11, "t2", use_rag=False)
+        rec2, _ = pipeline.blueprint("Simple Pendulum", 11, "t2", use_rag=False)
         assert seen == ["t2"] and rec2["teacher"] == "t2"       # other teacher: its own, never borrowed
-        assert len(pipeline.blueprint_files("Rolling motion")) == 3
-        assert pipeline.load_blueprint("Rolling motion", "t")["teacher"] == "t"
+        assert len(pipeline.blueprint_files("Simple Pendulum")) == 3
+        assert pipeline.load_blueprint("Simple Pendulum", "t")["teacher"] == "t"
     finally:
         llm.TRANSPORT = None
 
@@ -236,6 +236,34 @@ def test_write_new_never_overwrites():
     n = pipeline.run_name("teacher_student", "opus55", "deepseekv4flash")
     assert n.startswith("teacher_student__opus55-deepseekv4flash__") and pipeline.SAFE_NAME.fullmatch(n)
     assert not pipeline.SAFE_NAME.fullmatch("..\\app")
+
+
+def test_on_topic_guard():
+    ohm = {"title": "Ohm's law", "app": {"name": "Ohm's Lab", "subtitle": "Class 10 · Electricity · V–I relationship"},
+           "learning_objectives": ["relate V and I", "motion of electrons"]}
+    assert not pipeline.on_topic("Projectile Motion", ohm)          # the real drift seen on Render
+    assert pipeline.on_topic("Simple Pendulum", {"title": "Pendulum"})
+    assert pipeline.on_topic("Mechanism of Esterification of Carboxylic Acid",
+                             {"title": "Esterification", "app": {"name": "Ester Lab",
+                              "subtitle": "Class 12 · Carboxylic Acids · Esterification mechanism"}})
+
+
+def test_broken_script_gets_one_repair():
+    good = pipeline.EXAMPLE_TOPIC
+    for bad in (good[: len(good) // 2], good.replace("const APP={", "const APP={{", 1)):   # cut off / typo
+        assert pipeline.js_error(bad)
+        replies, prompts = [bad, "```js\n" + good + "\n```"], []
+        llm.TRANSPORT = lambda a, s, u, max_tokens=0: (prompts.append(u) or replies.pop(0), 10, 10)
+        os.environ.update({"MODEL_rep_ID": "m", "MODEL_rep_IN": "1", "MODEL_rep_OUT": "1", "LLM_BASE_URL": os.environ.get("LLM_BASE_URL", "x"), "LLM_API_KEY": os.environ.get("LLM_API_KEY", "x")})
+        html, us = pipeline._build("rep", "student", "P")
+        assert len(us) == 2 and "PREVIOUS ATTEMPT FAILED" in prompts[1] and pipeline.static_checks(html)["js_parses"]
+    llm.TRANSPORT = lambda a, s, u, max_tokens=0: (good[:100], 10, 10)
+    try:
+        pipeline._build("rep", "student", "P")
+        raise AssertionError("still broken after the repair call must raise")
+    except ValueError:
+        pass
+    llm.TRANSPORT = None
 
 
 def test_rag_off_without_dsn():

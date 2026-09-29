@@ -116,8 +116,10 @@ text), `%(grade)s`, `%(k)s`. Leave `NCERT_DSN` empty to run ungrounded.
 
 `static_checks()` gates every output with no model call: is it HTML, has a canvas/SVG,
 has controls, has script, **makes zero network requests**, has questions, plausible size,
-and `lab_shell`: it's a Lab app whose topic script declares `APP`, `STEPS` and `draw`
-and actually replaced the shell's example.
+`js_parses` (the topic script parses, checked with QuickJS) and `lab_shell`: it's a Lab app whose
+topic script declares `APP`, `STEPS` and `draw` and actually replaced the shell's example.
+A script that doesn't parse (a typo, or a reply cut off at the model's output limit) gets one
+repair call before the run fails; a blueprint that isn't about the requested topic is retried once.
 `--judge` adds a rubric-scored LLM grade (/25) at the cost of one extra call per output.
 Static checks are the gate; the judge is a signal, not a verdict.
 

@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 from .llm import Usage, call
-from .retrieve import ncert_context, NCERTError
+from .retrieve import ncert_context, NCERTError, keywords
 
 # ---------------------------------------------------------------- shared spec
 #
@@ -108,7 +108,7 @@ Shell state you READ (never reassign): step = steps completed (0..STEPS.length);
 {i,t,dur,k} while step i animates (k: 0 -> 1); S.preset (index), S.c[id] (slider values), S.toggle;
 T = seconds since load; VIEW = {x,y,w,h} the safe box below the HUD and above the caption.
 Helpers: ease(t) smoothstep, lerp(a,b,k), clamp(v,a,b), rr(x,y,w,h,r) rounded-rect path,
-txt(text,x,y,{size,weight,color,align}), pill(text) bottom caption, arrow(x0,y0,x1,y1,{color,width,label}),
+txt(text,x,y,{size,weight,color,align,bg}) label (bg: optional box colour behind it), pill(text) bottom caption, arrow(x0,y0,x1,y1,{color,width,label}),
 curly(x0,y0,x1,y1,bend,prog,color) curved flow / electron-pushing arrow drawn up to fraction prog,
 banner(text,bad) flash message, setControl(id,v) move a slider from code. INK = dark text colour, FONT = font stack.
 Reserved (do not redeclare): $, cv, ctx, W, H, T, step, anim, S, VIEW, INK, FONT and every helper above.
@@ -119,6 +119,9 @@ Drawing rules:
 - During step i animate with ease(anim.k): show the cause (arrow, flow, force) and interpolate the change,
   then hold the new state once the step is done (derive what to draw from step and anim).
 - Label every object (names, charges, forces, values with units). pill() a caption for the current state.
+- Draw ALL text with txt() (never ctx.fillText): the shell keeps txt() labels on the canvas and slides a
+  label to the nearest free line if it would cover another. For a label on a box, pass {bg} instead of
+  drawing the box yourself, so the box moves with the label. Keep labels short (<= 4 words).
 - Numbers on the stage and HUD come from the equations and the preset/slider values, not decoration."""
 
 TEACHER_PLAN_SYS = (
@@ -138,7 +141,9 @@ BUILD_SYS = ("You are an expert front-end engineer and science educator. You wri
 
 def _ctx(context):
     return ("\n\nNCERT SOURCE MATERIAL. Use ONLY facts, definitions, values and terms found in this text. "
-            "If something you would like to show is not in it, leave it out — do not fill gaps from memory:\n"
+            "If something you would like to show is not in it, leave it out — do not fill gaps from memory. "
+            "The topic above is fixed: passages here about other topics are search noise, ignore them; "
+            "never switch to the topic of the source:\n"
             f"{context}\n") if context else ""
 
 
@@ -217,8 +222,26 @@ def extract_topic(text):
     if m:
         return m.group(1).strip()
     m = ANY_FENCE.search(text)
-    body = m.group(1) if m else text
+    # an unclosed opening fence means the reply was cut off: keep the code, drop the fence,
+    # so the syntax check reports the truncation instead of a stray ``` token
+    body = m.group(1) if m else re.sub(r"^\s*```[a-z]*[ \t]*\n", "", text, flags=re.I)
     return body.strip() if "const APP" in body else ""
+
+
+def js_error(topic_js):
+    """Syntax error in a TOPIC script (str), or None. QuickJS parses it without running it;
+    if QuickJS isn't installed the check is skipped (None)."""
+    try:
+        import quickjs
+    except ImportError:
+        return None
+    try:
+        quickjs.Context().eval("new Function(" + json.dumps(topic_js or "") + ")")
+        return None
+    except Exception as e:
+        msg = str(e).strip().splitlines()
+        line = next((l for l in msg if "<input>:" in l), "")
+        return f"{msg[0]} {line.strip()}".strip()
 
 
 def assemble(topic_js):
@@ -261,6 +284,7 @@ def static_checks(html):
         "has_questions": low.count("?") >= 3 or low.count("question") >= 3,
         "size_ok": 2000 < len(html) < 400_000,
         # built as a Lab app: shell present, the core TOPIC names declared, example replaced
+        "js_parses": js_error(topic_of(html)) is None if topic_of(html) is not None else True,
         "lab_shell": (EXAMPLE_SENTINEL not in html and all(
             re.search(p, topic_of(html) or "") for p in (r"\bconst APP\b", r"\bconst STEPS\b", r"\bfunction draw\b"))),
     }
@@ -336,6 +360,23 @@ def verify_evidence(plan, context):
     return len(quotes), sum(1 for q in quotes if _norm(q).rstrip(".") in src)
 
 
+_GENERIC = {"working", "mechanism", "process", "experiment", "principle", "structure", "introduction",
+            "basics", "types", "properties", "applications", "application", "concept", "study"}
+
+
+def on_topic(topic, plan):
+    """False when a blueprint is plainly about something else (a 'Projectile Motion' request that
+    came back as an Ohm's-law lab). Compared on 4-letter stems of the topic's own words: the
+    title/app name/subtitle must name at least one, and with the learning objectives at least half."""
+    kw = [w for w in keywords(topic) if w not in _GENERIC]
+    if not kw:
+        return True
+    app = plan.get("app") or {}
+    head = " ".join(str(x) for x in (plan.get("title", ""), app.get("name", ""), app.get("subtitle", ""))).lower()
+    full = head + " " + " ".join(str(x) for x in plan.get("learning_objectives") or []).lower()
+    return any(w[:4] in head for w in kw) and sum(w[:4] in full for w in kw) * 2 >= len(kw)
+
+
 def grounding(topic, grade, use_rag):
     """NCERT text for a topic. RAG asked for but not delivered (no DSN, DB down, nothing on the
     topic) raises NCERTError: 'grounded' must never silently mean 'ungrounded'."""
@@ -372,6 +413,8 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
             quoted, verified = verify_evidence(plan, context) if context else (0, 0)
             if context and not verified:
                 raise ValueError("blueprint quotes no NCERT text: evidence missing or not found in the source")
+            if not on_topic(topic, plan):
+                raise ValueError(f"blueprint is not about {topic!r} (got {plan.get('title')!r})")
             break
         except (ValueError, KeyError):
             if attempt == 2:
@@ -389,6 +432,28 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
     return rec, usages
 
 
+def _build(alias, role, prompt):
+    """One builder call, plus one repair call if the script doesn't parse (a typo, or a reply
+    cut off at the model's output limit). Returns (html, [Usage]); raises if still broken."""
+    text, u = call(alias, BUILD_SYS, prompt, role=role)
+    usages = [u]
+    for attempt in (1, 2):
+        js = extract_topic(text)
+        page = build_html(text)
+        err = "no TOPIC script found" if not page else (js_error(js) if js else None)
+        if not err:
+            return page, usages
+        if attempt == 2:
+            raise ValueError(f"{alias} built a broken TOPIC script: {err}")
+        cut = u.finish == "length" or not (js or "").rstrip().endswith(("}", ";", ")", "]"))
+        fix = (f"\n\nYOUR PREVIOUS ATTEMPT FAILED: {err}."
+               + (" It was cut off before the end. Write the COMPLETE script again, more compactly: "
+                  "shorter helper code, no comments, same content." if cut else
+                  " Output the whole corrected TOPIC script."))
+        text, u = call(alias, BUILD_SYS, prompt + fix, role=role)
+        usages.append(u)
+
+
 def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True):
     """mode in {teacher_only, student_only, teacher_student}.
     Returns (html, plan_or_None, [Usage]) — usages are only calls made in this run."""
@@ -396,20 +461,14 @@ def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True
         rec, usages = blueprint(topic, grade, teacher, use_rag, force=not reuse_blueprint)
         # The blueprint already carries the grounded facts, so the student doesn't
         # re-pay for the NCERT context. That is where most of the saving comes from.
-        text, u = call(student, BUILD_SYS, _build_prompt(topic, grade, "", rec["plan"]), role="student")
-        html_out = build_html(text)
-        if not html_out:
-            raise ValueError(f"{student} returned no TOPIC script.")
-        return html_out, rec["plan"], usages + [u]
+        html_out, bu = _build(student, "student", _build_prompt(topic, grade, "", rec["plan"]))
+        return html_out, rec["plan"], usages + bu
 
     context = grounding(topic, grade, use_rag)
     if mode in ("teacher_only", "student_only"):
         alias, role = (teacher, "teacher") if mode == "teacher_only" else (student, "student")
-        text, u = call(alias, BUILD_SYS, _build_prompt(topic, grade, context), role=role)
-        html_out = build_html(text)
-        if not html_out:
-            raise ValueError(f"{alias} returned no TOPIC script.")
-        return html_out, None, [u]
+        html_out, bu = _build(alias, role, _build_prompt(topic, grade, context))
+        return html_out, None, bu
 
     raise ValueError(f"unknown mode {mode}")
 

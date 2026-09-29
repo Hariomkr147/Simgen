@@ -72,7 +72,7 @@ p{margin:0}
 .dots i{width:16px;height:5px;border-radius:3px;background:var(--chip)}
 .dots i.on{background:var(--accent)} .dots i.done{background:var(--gold)}
 .coach-do{font-size:15px}
-.btn.play{padding:6px 12px;min-height:0;font-size:13px;border-radius:10px;flex:none;white-space:nowrap}
+.btn.autoplay{padding:6px 12px;min-height:0;font-size:13px;border-radius:10px;flex:none;white-space:nowrap}
 .mode{display:inline-grid;grid-auto-flow:column;gap:2px;padding:3px;background:var(--chip);border-radius:10px;flex:none}
 .mode button{border:0;background:transparent;border-radius:8px;padding:6px 10px;font-size:13px}
 .mode button[aria-pressed="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -83,13 +83,14 @@ p{margin:0}
 .hud div{display:grid;min-width:0}
 .hud span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--hud-dim);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud b{font-family:var(--score);font-size:20px;color:var(--hud-ink);font-variant-numeric:tabular-nums;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud b.long{font-size:14px}
 .hud b small{font-size:11px;color:var(--hud-dim);font-weight:600;margin-left:2px}
 
 .side{grid-area:side;display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow:auto}
 .side>*{min-width:0;flex:none}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:var(--shadow)}
 .label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.label em{font-style:normal;color:var(--accent);text-transform:none;letter-spacing:0;font-size:14px}
+.label em{font-style:normal;color:var(--accent);text-transform:none;letter-spacing:0;font-size:14px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grounds{display:grid;gap:6px;margin-top:8px}
 .gchip{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:7px 10px;text-align:left;min-height:44px;font-size:14px;white-space:nowrap;touch-action:manipulation}
 .gchip span{display:grid;line-height:1.2}
@@ -123,8 +124,8 @@ input[type=range]:disabled{opacity:.5}
 .sheet-back{position:absolute;inset:0;background:rgba(8,16,11,.18);border-radius:16px;z-index:30}
 .sheet{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;max-height:74%;overflow:auto;z-index:31;background:var(--surface);border-radius:20px 20px 16px 16px;box-shadow:0 -10px 40px rgba(0,0,0,.25);padding:12px 16px 16px;display:grid;gap:10px}
 @media (min-width:761px){
-  .sheet-back{left:auto;width:320px;background:transparent}
-  .sheet{left:auto;right:0;width:340px;max-height:calc(100% - 70px);border-radius:18px;border:2px solid var(--gold)}
+  .sheet-back{grid-area:side;position:relative;inset:auto;background:transparent}
+  .sheet{grid-area:side;position:relative;inset:auto;margin:0;width:auto;max-width:none;align-self:start;max-height:100%;border-radius:16px;border:2px solid var(--gold)}
 }
 .sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto}
 .sheet h3{font-size:19px}
@@ -159,21 +160,27 @@ input[type=range]:disabled{opacity:.5}
 
 /* ---------- Phone ---------- */
 @media (max-width:760px){
-  .app{padding:8px 12px 10px;gap:8px;min-height:480px}
+  .app{padding:8px 12px 10px;gap:8px;min-height:480px;height:auto}
+  .screen{flex:none}
+  .sheet-back{position:fixed;border-radius:0}
+  .sheet{position:fixed;max-height:80vh}
   .brand h1{font-size:17px}
   .brand{gap:8px}
   .brand small{display:none}
   .logo{width:30px;height:30px;font-size:13px}
   .tabs button{padding:6px 12px}
   .iconbtn{width:32px;height:32px;font-size:16px}
-  .play{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(170px,1fr) auto;grid-template-areas:"coach" "stage" "side";gap:8px}
-  .coach{padding:8px 10px;gap:10px;border-radius:14px}
+  .play{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;grid-template-areas:"coach" "stage" "side";gap:8px}
+  .coach{padding:8px 10px;gap:8px 10px;border-radius:14px;flex-wrap:wrap}
+  .coach-body{flex:1 1 calc(100% - 52px)}
+  .btn.autoplay{margin-left:48px}
   .badge{width:38px;height:34px;border-radius:10px;font-size:10px}
   .coach-do{font-size:14px}
   .mode button{padding:5px 8px;font-size:12px}
-  .stage{border-radius:14px;min-height:170px}
+  .stage{border-radius:14px;min-height:max(280px,75vw)}
   .hud{padding:5px 8px}
   .hud b{font-size:16px}
+  .hud b.long{font-size:11px}
   .hud span{font-size:9px}
   .side{gap:8px;overflow:visible}
   .card{padding:8px 10px;border-radius:14px;box-shadow:none}
@@ -219,7 +226,7 @@ input[type=range]:disabled{opacity:.5}
           <div class="coach-top"><span class="pill" id="gStep"></span><span class="dots" id="gDots"></span></div>
           <p class="coach-do" id="gDo"></p>
         </div>
-        <button class="btn play" id="bPlay" aria-label="Start automatic walkthrough">▶ Start</button>
+        <button class="btn autoplay" id="bPlay" aria-label="Start automatic walkthrough">▶ Start</button>
         <div class="mode" role="group" aria-label="Mode">
           <button id="modeGuided" aria-pressed="true">Guide</button>
           <button id="modeFree" aria-pressed="false">Challenge</button>
@@ -280,8 +287,29 @@ const INK="#26323b",FONT="'Atkinson Hyperlegible','Segoe UI',system-ui,sans-seri
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,k)=>a+(b-a)*k;
 function ease(t){t=clamp(t,0,1);return t*t*(3-2*t);}
 function rr(x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);}
-function txt(t,x,y,o={}){ctx.font=`${o.weight||700} ${o.size||13}px ${FONT}`;ctx.fillStyle=o.color||INK;ctx.textAlign=o.align||"center";ctx.textBaseline="middle";ctx.fillText(String(t),x,y);ctx.textBaseline="alphabetic";}
-function pill(t){ctx.font=`700 14px ${FONT}`;const tw=Math.min(W-16,ctx.measureText(t).width+22);ctx.fillStyle="rgba(38,50,59,.88)";rr(W/2-tw/2,H-36,tw,26,13);ctx.fill();ctx.fillStyle="#fff";ctx.textAlign="center";ctx.fillText(t,W/2,H-18,W-28);}
+// Labels placed this frame (board coordinates). txt() keeps a label on the canvas and, if it would
+// sit on top of a label already drawn this frame, slides it up/down to the nearest free line.
+let __tb=[];const __base=()=>(window.devicePixelRatio||1)*__SC;let __SC=1;
+function txt(t,x,y,o={}){t=String(t);const size=o.size||13,al=o.align||"center";
+  ctx.font=`${o.weight||700} ${size}px ${FONT}`;ctx.fillStyle=o.color||INK;ctx.textAlign=al;ctx.textBaseline="middle";
+  const m=ctx.getTransform(),b=__base(),flat=!m.b&&!m.c;let dy=0;
+  if(flat&&t.trim()){const k=m.a/b,w=ctx.measureText(t).width*k,h=size*1.2*k,X=(m.a*x+m.e)/b,Y=(m.d*y+m.f)/b;
+    let x0=al==="center"?X-w/2:(al==="right"||al==="end")?X-w:X;const dx=clamp(x0,2,Math.max(2,W-2-w))-x0;x0+=dx;x+=dx/k;
+    const free=d=>Y+d-h/2>=0&&Y+d+h/2<=H&&!__tb.some(r=>x0<r.x+r.w-1&&x0+w>r.x+1&&Y+d-h/2<r.y+r.h-1&&Y+d+h/2>r.y+1);
+    if(o.fixed)dy=0;else for(const d of [0,h,-h,2*h,-2*h,3*h,-3*h])if(free(d)){dy=d;break;}
+    __tb.push({x:x0,y:Y+dy-h/2,w,h});dy/=k;}
+  if(o.bg){const w=ctx.measureText(t).width,x0=al==="center"?x-w/2:(al==="right"||al==="end")?x-w:x,c=ctx.fillStyle;
+    ctx.fillStyle=o.bg;rr(x0-5,y+dy-size*.75,w+10,size*1.5,5);ctx.fill();ctx.fillStyle=c;}
+  ctx.fillText(t,x,y+dy);ctx.textBaseline="alphabetic";}
+function pill(t){t=String(t);let fs=14;ctx.font=`700 ${fs}px ${FONT}`;const max=W-28;
+  while(ctx.measureText(t).width>max&&fs>11){fs--;ctx.font=`700 ${fs}px ${FONT}`;}
+  let lines=[t];if(ctx.measureText(t).width>max){const ws=t.split(" ");let best=1,bd=1e9;
+    for(let i=1;i<ws.length;i++){const d=Math.abs(ctx.measureText(ws.slice(0,i).join(" ")).width-ctx.measureText(ws.slice(i).join(" ")).width);if(d<bd){bd=d;best=i;}}
+    lines=[ws.slice(0,best).join(" "),ws.slice(best).join(" ")];}
+  const lh=fs+4,bh=lines.length*lh+8,tw=Math.min(W-16,Math.max(...lines.map(l=>ctx.measureText(l).width))+22),y0=H-10-bh;
+  ctx.fillStyle="rgba(38,50,59,.88)";rr(W/2-tw/2,y0,tw,bh,13);ctx.fill();ctx.fillStyle="#fff";ctx.textAlign="center";ctx.textBaseline="middle";
+  lines.forEach((l,i)=>ctx.fillText(l,W/2,y0+4+lh*(i+.5),max));ctx.textBaseline="alphabetic";
+  __tb.push({x:W/2-tw/2,y:y0,w:tw,h:bh});}
 function arrow(x0,y0,x1,y1,o={}){const c=o.color||INK,w=o.width||3,a=Math.atan2(y1-y0,x1-x0),s=Math.max(8,w*3.2);ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=w;ctx.lineCap="round";
   ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1-Math.cos(a)*s*.8,y1-Math.sin(a)*s*.8);ctx.stroke();
   ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1-Math.cos(a-.45)*s,y1-Math.sin(a-.45)*s);ctx.lineTo(x1-Math.cos(a+.45)*s,y1-Math.sin(a+.45)*s);ctx.closePath();ctx.fill();
@@ -387,7 +415,12 @@ function safe(n,...a){const f=hook(n);if(!f)return undefined;try{return f(...a);
 function showErr(msg){$("coachIcon").textContent="ERR";$("coachIcon").classList.add("err");$("gStep").textContent="Something went wrong";$("gDo").textContent=msg;}
 
 let dpr=1;
-function resize(){const r=cv.getBoundingClientRect();if(!r.width)return;dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
+// The board is never laid out narrower than MIN_W x MIN_H: a phone gets the same layout scaled down,
+// not a squashed one where labels pile up.
+const MIN_W=520,MIN_H=320;
+function resize(){const r=cv.getBoundingClientRect();if(!r.width)return;dpr=window.devicePixelRatio||1;
+  __SC=Math.min(1,r.width/MIN_W,r.height/MIN_H);W=r.width/__SC;H=r.height/__SC;
+  cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);ctx.setTransform(dpr*__SC,0,0,dpr*__SC,0,0);}
 if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);else addEventListener("resize",resize);
 
 if(!CFG.app||!Array.isArray(CFG.steps)||!CFG.steps.length||!hook("draw")){
@@ -463,7 +496,7 @@ $("bReset").onclick=()=>{if(!anim)resetMech();};
 /* ---------- HUD ---------- */
 const hudEl=$("hud"),hudB=[],hudCache=[];
 for(let i=0;i<4;i++){const h=CFG.hud[i],lab=h==null?"":(typeof h==="string"?h:h.label||"");const d=document.createElement("div");d.innerHTML=`<span>${lab}</span><b>–</b>`;hudEl.appendChild(d);hudB.push(d.querySelector("b"));}
-function updateHud(){const v=safe("readouts")||[];for(let i=0;i<4;i++){const s=v[i]==null?"–":String(v[i]);if(s!==hudCache[i]){hudB[i].innerHTML=s;hudCache[i]=s;}}}
+function updateHud(){const v=safe("readouts")||[];for(let i=0;i<4;i++){const s=v[i]==null?"–":String(v[i]);if(s!==hudCache[i]){hudB[i].innerHTML=s;const plain=s.replace(/<[^>]*>/g,"");hudB[i].classList.toggle("long",plain.length>9);hudB[i].title=plain;hudCache[i]=s;}}}
 
 /* ---------- Mechanics ---------- */
 function durOf(i){const d=STEPSC[i].dur,v=typeof d==="function"?get(d):d;return clamp(+v||2.3,.3,30);}
@@ -499,12 +532,13 @@ function board(){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#fb
 function drawBanner(){
   if(!__banner)return;const a=Math.min(1,__banner.t*3);
   ctx.font="800 17px 'Baloo 2','Trebuchet MS',sans-serif";const tw=Math.min(W-20,ctx.measureText(__banner.text).width+26),bh=32;
-  ctx.globalAlpha=a;ctx.fillStyle=__banner.bad?"#b93838":"#f5b301";rr(W/2-tw/2,64,tw,bh,10);ctx.fill();
-  ctx.fillStyle=__banner.bad?"#fff":"#241a00";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(__banner.text,W/2,64+bh/2+1,W-30);ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
+  const by=hudBottom()+6;ctx.globalAlpha=a;ctx.fillStyle=__banner.bad?"#b93838":"#f5b301";rr(W/2-tw/2,by,tw,bh,10);ctx.fill();
+  ctx.fillStyle=__banner.bad?"#fff":"#241a00";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(__banner.text,W/2,by+bh/2+1,W-30);ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
 }
+function hudBottom(){const h=$("hud");return (h.offsetTop+h.offsetHeight)/__SC;}
 function frame(){
-  ctx.clearRect(0,0,W,H);board();
-  VIEW.x=14;VIEW.w=Math.max(40,W-28);VIEW.y=H<300?66:100;VIEW.h=Math.max(60,H-VIEW.y-48);
+  ctx.clearRect(0,0,W,H);board();__tb=[];
+  VIEW.x=14;VIEW.w=Math.max(40,W-28);VIEW.y=hudBottom()+(H<340?10:44);VIEW.h=Math.max(60,H-VIEW.y-52);
   ctx.save();safe("draw",ctx,W,H);ctx.restore();drawBanner();
 }
 
