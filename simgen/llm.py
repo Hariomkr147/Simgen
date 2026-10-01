@@ -65,8 +65,9 @@ def _usage_fields(u):
     return (float(cost) if cost is not None else None), int(cached)
 
 
-def call(alias, system, user, role="", max_tokens=32000, temperature=0.3, reasoning_tokens=1500):
-    """Returns (text, Usage)."""
+def call(alias, system, user, role="", max_tokens=32000, temperature=0.3, reasoning_tokens=1500, timeout=None):
+    """Returns (text, Usage). `timeout` (seconds) fails the call fast and without a retry; the default
+    10 min + 1 retry is for builds, which really are slow."""
     spec = model_spec(alias)
     t0 = time.time()
     reported, cached, finish = None, 0, ""
@@ -78,7 +79,7 @@ def call(alias, system, user, role="", max_tokens=32000, temperature=0.3, reason
     else:
         from openai import OpenAI
         client = OpenAI(base_url=spec["base_url"], api_key=spec["api_key"],
-                        timeout=600, max_retries=1)
+                        timeout=timeout or 600, max_retries=0 if timeout else 1)
         extra = {"reasoning": {"max_tokens": reasoning_tokens}} if reasoning_tokens is not None else None
         r = client.chat.completions.create(
             model=spec["id"],

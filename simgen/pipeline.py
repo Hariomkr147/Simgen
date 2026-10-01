@@ -603,7 +603,8 @@ def judge(html, topic, grade, judge_alias):
     src = topic_of(html) or html   # the fixed shell is the same for every sim: don't pay to grade it
     text, u = call(judge_alias, JUDGE_SYS,
                    f"Topic: {topic}\nGrade: {grade}\n\n{JUDGE_RUBRIC}\n\nSIMULATION SOURCE:\n{src[:60000]}",
-                   role="judge", max_tokens=8000)
+                   role="judge", max_tokens=8000,
+                   timeout=int(os.getenv("JUDGE_TIMEOUT", "90")))   # the judge is optional: never wait minutes on it
     scores = extract_json(text)
     scores["issues"] = [i for i in scores.get("issues") or [] if isinstance(i, dict) and i.get("fix")][:5]
     keys = ("scientific_accuracy", "ncert_alignment", "interactivity",
