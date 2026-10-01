@@ -58,7 +58,8 @@ def main(argv=None):
     ap.add_argument("--grade", type=int)
     ap.add_argument("--modes", default="all", help="comma list or 'all': " + ",".join(pipeline.MODES))
     ap.add_argument("--teacher", default=os.getenv("TEACHER", "opus5"))
-    ap.add_argument("--student", default=os.getenv("STUDENT", "gemini38flash"))
+    ap.add_argument("--student", default=os.getenv("STUDENT", "gemini38flash"),
+                    help="model alias, or 'auto' to pick by difficulty (STUDENT_EASY/MEDIUM/HARD)")
     ap.add_argument("--judge", action="store_true", help="grade each output with JUDGE model (costs extra)")
     ap.add_argument("--judge-model", default=os.getenv("JUDGE", "opus5"))
     ap.add_argument("--no-rag", action="store_true", help="skip NCERT retrieval")

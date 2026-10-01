@@ -266,6 +266,57 @@ def test_broken_script_gets_one_repair():
     llm.TRANSPORT = None
 
 
+def test_tier_estimate_and_final():
+    t = pipeline.estimate_tier
+    assert t("Class 6 Science: Parts of a plant", 6)[0] == "easy"
+    assert t("Class 9 Science: Simple Pendulum", 9)[0] == "medium"
+    assert t("Class 12 Physics: Electromagnetic induction", 12)[0] == "hard"
+    assert t("Class 10 Science: Working of DC motor")[0] == "medium"          # class parsed from the topic text
+    assert t("Class 8 Science: Cell", 8, "a = b = c = d = e = f = g = h = " * 3)[0] == "medium"   # equation-heavy source
+    f = pipeline.final_tier
+    assert f("easy", {"build_tier": "hard"}) == "hard"                         # teacher can raise
+    assert f("hard", {"build_tier": "easy"}) == "hard"                         # never lowers
+    assert f("easy", {"build_tier": "bogus"}) == "easy"
+    assert f("easy", {"science": {"equations": ["a", "b"]}}) == "medium"
+    assert f("easy", {"science": {"equations": list("abcde")}}) == "hard"
+
+
+def test_auto_student_routes_by_tier_and_escalates():
+    """student='auto': the blueprint's tier picks the student; a broken build moves up a tier."""
+    good, built = pipeline.EXAMPLE_TOPIC, []
+    for a in ("lo", "mid", "hi", "tch"):
+        os.environ.update({f"MODEL_{a}_ID": a, f"MODEL_{a}_IN": "1", f"MODEL_{a}_OUT": "1"})
+    os.environ.update({"LLM_BASE_URL": "x", "LLM_API_KEY": "x",
+                       "STUDENT_EASY": "lo", "STUDENT_MEDIUM": "mid", "STUDENT_HARD": "hi"})
+    broken = {"lo"}                                   # the easy-tier model can't build this one
+
+    def fake(alias, system, user, max_tokens=0):
+        if "JSON shape" in user:
+            return json.dumps(dict(PLAN, build_tier="easy")), 10, 10
+        built.append(alias)
+        return ("```js\n" + good[:60] + "\n```" if alias in broken else "```js\n" + good + "\n```"), 10, 10
+
+    llm.TRANSPORT = fake
+    pipeline.BLUEPRINTS = Path(tempfile.mkdtemp())
+    try:
+        html, plan, us = pipeline.run("teacher_student", "Pendulum", 6, "tch", "auto",
+                                      use_rag=False, reuse_blueprint=False)
+        assert built == ["lo", "lo", "mid"], built       # easy tried (+ its repair), then medium built it
+        assert [u.role for u in us] == ["teacher", "student", "student", "student"] and pipeline.static_checks(html)["js_parses"]
+        built.clear(); broken.clear()
+        pipeline.run("teacher_student", "Pendulum", 6, "tch", "auto", use_rag=False)  # stored blueprint
+        assert built == ["lo"]
+        built.clear()
+        os.environ["HARD_SINGLE"] = "1"                  # hard topic + HARD_SINGLE: no blueprint, one frontier call
+        html, plan, us = pipeline.run("teacher_student", "Class 12 Physics: Electromagnetic induction", 12, "tch", "auto",
+                                      use_rag=False)
+        assert plan is None and built == ["hi"] and len(us) == 1, (plan, built)
+    finally:
+        llm.TRANSPORT = None
+        for k in ("HARD_SINGLE", "STUDENT_EASY", "STUDENT_MEDIUM", "STUDENT_HARD"):
+            os.environ.pop(k, None)
+
+
 def test_rag_off_without_dsn():
     os.environ.pop("NCERT_DSN", None)
     assert retrieve.ncert_context("Simple Pendulum", 9) == ""

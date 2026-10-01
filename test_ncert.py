@@ -28,7 +28,23 @@ def test_keywords():
     assert keywords("Class 10 Science: Reflection of Light") == ["reflection", "light"]
     assert keywords("Class 9 Science: Simple Pendulum") == ["simple", "pendulum"]
     assert keywords("Class 8 Maths: Chapter 3") == []                     # nothing searchable
+    assert keywords("Class 10 Science: Working of DC Motor") == ["working", "dc", "motor"]   # 'DC' used to be dropped
     assert keywords("Ohm's Law; DROP TABLE x--") == ["ohm", "law", "drop", "table"]   # no tsquery syntax survives
+
+
+def test_relevance():
+    """A section on the topic outscores a passing mention, whatever the full-text match says."""
+    r = retrieve.relevance
+    kw = ["dc", "motor"]
+    section = "## 4.8 DC Motor\nA DC motor converts electrical energy to mechanical energy. The armature turns in the field."
+    passing = "## 6.3 Neurons\n" + "Motor neurons carry signals to muscles. " * 6 + "A DC supply is a source of current. " + "x " * 200
+    far = "## 3.1 Introduction\n" + "word " * 300 + "the dc motor is used in fans."
+    assert r(section, kw) >= retrieve.CORE_SCORE > r(far, kw), (r(section, kw), r(far, kw))
+    assert r("![](page=1)\nfigure", kw) == 0
+    assert r("## 11.5 Summary\nIn this chapter you studied the dc motor, the dc motor again.", kw) < retrieve.CORE_SCORE
+    assert r("Only the motor is mentioned here.", kw) == 0, "a 2-word topic needs both words"
+    assert retrieve.core_keywords("Class 10 Science: Working of DC Motor") == ["dc", "motor"]
+    assert retrieve.core_keywords("Class 9: Working") == ["working"]       # nothing but generic words: keep them
 
 
 def _db_tests(dsn):
@@ -70,6 +86,29 @@ def _db_tests(dsn):
     assert not any(r.startswith("![](") for r in cone), cone
     assert ncert_chunks("Class 10 Science: Quantum Chromodynamics", 10, dsn=dsn) == []
 
+    # --- wrong-topic extraction: the "Working of DC Motor, Class 10" case
+    with psycopg.connect(dsn, autocommit=True) as c:
+        for g, t in ((10, "## 6.2 Motor neurons\nMotor neurons carry impulses from the spinal cord to muscles. Sensory and motor neurons form a reflex arc."),
+                     (10, "## 12.4 Magnetic effects\nA current carrying wire deflects a magnet. " + "The wire carries a current in a field. " * 5
+                          + "A DC supply drives the motor in a toy car. " + "More text about fields. " * 30),
+                     (12, "## 4.8 DC Motor\nA DC motor converts electrical energy to mechanical energy. The armature of the DC motor rotates because the field exerts a torque on the current loop."),
+                     (11, "## 5.1 Rotation\nThe motor of a ceiling fan turns the blades. A DC motor is one kind.")):
+            c.execute("INSERT INTO knowledge_graph.graph_nodes (class_level, ground_truth_content) VALUES (%s,%s)", (g, t))
+    gd = retrieve.ncert_ground("Class 10 Science: Working of DC Motor", 10, dsn=dsn)
+    assert gd.chunks and gd.chunks[0].startswith("## 4.8 DC Motor") and len(gd.chunks) == 1, gd.chunks
+    assert gd.grades == (12,) and "Class 12, not Class 10" in gd.note, (gd.grades, gd.note)   # one class, and it says so
+    assert not any("neuron" in c for c in gd.chunks), "motor neuron text leaked in"
+    assert retrieve.ncert_ground("Class 12 Physics: DC motor", 12, dsn=dsn).note == ""
+    # nothing in the DB is ABOUT it, only passing mentions -> empty, with the closest headings for the error
+    gm = retrieve.ncert_ground("Class 10 Science: Toy car", 10, dsn=dsn)
+    assert gm.chunks == [] and gm.closest and "Magnetic effects" in gm.closest[0], (gm.chunks, gm.closest)
+    os.environ["NCERT_DSN"] = dsn
+    try:
+        pipeline.grounding("Class 10 Science: Toy car", 10, True)
+        raise AssertionError("expected NCERTError")
+    except NCERTError as e:
+        assert "Reword it the way NCERT does" in str(e) and "Magnetic effects" in str(e), e
+
     # strict grounding through the pipeline: asked for, not delivered -> error, never silently ungrounded
     os.environ["NCERT_DSN"] = dsn
     ctx = pipeline.grounding("Class 10 Science: Reflection of Light", 10, True)
@@ -86,6 +125,29 @@ def _db_tests(dsn):
     except NCERTError:
         pass
     return ctx
+
+
+def test_teacher_says_source_is_off_topic():
+    """The teacher reads the retrieved text; if it says the text covers none of the topic, stop."""
+    from simgen import llm
+    os.environ.update({"LLM_BASE_URL": "x", "LLM_API_KEY": "x", "MODEL_t_ID": "m", "MODEL_t_IN": "1", "MODEL_t_OUT": "1"})
+    quote = FIXTURE[0][1].split(".")[0]
+    seen = []
+    plan = {"title": "Reflection of light", "steps": [], "evidence": [quote], "source_covers_topic": "none"}
+    llm.TRANSPORT = lambda a, sy, u, max_tokens=0: (seen.append(u) or json.dumps(plan), 10, 10)
+    ctx = retrieve.Context(FIXTURE[0][1]); ctx.note = "NCERT teaches this in Class 12, not Class 10."
+    pipeline.grounding = lambda *a: ctx
+    pipeline.BLUEPRINTS = __import__("pathlib").Path(tempfile.mkdtemp())
+    try:
+        pipeline.blueprint("Reflection of light", 10, "t", force=True)
+        raise AssertionError("expected NCERTError")
+    except NCERTError as e:
+        assert "covers none" in str(e)
+    assert "NOTE: NCERT teaches this in Class 12" in seen[0] and "build_tier" in seen[0]
+    plan["source_covers_topic"] = "partial"
+    rec, _ = pipeline.blueprint("Reflection of light", 10, "t", force=True)
+    assert rec["grounding"] == {"covers": "partial", "grades": [], "note": ctx.note}, rec["grounding"]
+    llm.TRANSPORT = None
 
 
 def test_evidence_check():
@@ -116,9 +178,9 @@ def test_blueprint_must_quote_source(tmp=None):
 
 def main():
     load_env()   # NCERT_DSN / NCERT_SQL from .env
-    test_keywords(); test_evidence_check()
+    test_keywords(); test_relevance(); test_evidence_check()
     real = pipeline.grounding
-    test_blueprint_must_quote_source(); pipeline.grounding = real
+    test_blueprint_must_quote_source(); test_teacher_says_source_is_off_topic(); pipeline.grounding = real
     dsn = os.environ.get("NCERT_DSN")
     if dsn:
         import psycopg
@@ -131,9 +193,12 @@ def main():
         for t in topics:
             t, _, g = t.partition("|")
             t, g = t.strip(), int(g) if g.strip().isdigit() else None
-            hits = ncert_chunks(t, g)
+            gd = retrieve.ncert_ground(t, g)
+            hits = gd.chunks
             miss += not hits
-            print(f"  {len(hits)} chunk(s)  {t}" + (f"  | top: {hits[0][:70]!r}" if hits else "  | NOT GROUNDED"))
+            print(f"  {len(hits)} chunk(s) from class {list(gd.grades) or '?'}  {t}"
+                  + (f"  | top: {hits[0].strip()[:60]!r}" + (f"  | {gd.note}" if gd.note else "") if hits
+                     else f"  | NOT GROUNDED (rejected: {'; '.join(gd.closest) or 'nothing matched'})"))
         print(f"{len(topics) - miss}/{len(topics)} topics grounded")
     else:
         try:

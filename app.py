@@ -202,9 +202,12 @@ def model_options(kind, selected):
     aliases = listed or sorted(k[len("MODEL_"):-len("_ID")] for k in os.environ
                                if k.startswith("MODEL_") and k.endswith("_ID") and "batch" not in k.lower())
     opts = []
+    if kind == "student":
+        aliases = [pipeline.AUTO] + aliases
     for a in aliases:
         sel = " selected" if a.lower() == (selected or "").lower() else ""
-        opts.append(f'<option value="{html.escape(a)}"{sel}>{html.escape(a)}</option>')
+        label = "auto (by difficulty)" if a == pipeline.AUTO else a
+        opts.append(f'<option value="{html.escape(a)}"{sel}>{html.escape(label)}</option>')
     return "".join(opts)
 
 
@@ -508,7 +511,7 @@ def run():
         confidence = pipeline.confidence_pct(scores)
 
         split, extra = "", {}
-        if mode == "teacher_student":
+        if mode == "teacher_student" and plan is not None:   # plan None: hard topic built whole by one model
             rec = pipeline.load_blueprint(topic, teacher) or {}  # the one run() just used
             fresh = any(u.role == "teacher" for u in usages)
             student_cost = sum(u.cost_usd for u in usages if u.role == "student")

@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 from .llm import Usage, call
-from .retrieve import ncert_context, NCERTError, keywords
+from .retrieve import ncert_ground, NCERTError, keywords, GENERIC as _GENERIC
 
 # ---------------------------------------------------------------- shared spec
 #
@@ -54,6 +54,8 @@ PLAN_SCHEMA = """{
   "title": str,
   "grade": int, "subject": str, "ncert_refs": [str], "learning_objectives": [str],
   "evidence": ["3-6 sentences copied VERBATIM from the NCERT SOURCE MATERIAL that the science relies on (empty list only if no source was given)"],
+  "source_covers_topic": "full | partial | none: does the NCERT SOURCE MATERIAL actually teach the topic above? 'none' if it is about something else; 'partial' if key parts are missing (omit if no source was given)",
+  "build_tier": "easy | medium | hard: how hard this blueprint is for a small model to code. easy = a few static objects and simple motion; medium = one continuous model or 2D geometry (rays, vectors, a circuit); hard = several interacting moving parts, coupled equations, 3D or field/wave geometry, or 5+ distinct step animations",
   "app": {"name": "2-3 words ending in Lab, e.g. Ester Lab", "subtitle": "Class N · chapter · focus",
           "mark": "1-2 chars for the logo", "accent": "#hex, saturated, readable on white",
           "accent_dark": "#hex, lighter tint of accent for dark mode"},
@@ -139,8 +141,10 @@ BUILD_SYS = ("You are an expert front-end engineer and science educator. You wri
              "a fixed Lab-app shell into an accurate, animated NCERT teaching simulation.")
 
 
-def _ctx(context):
-    return ("\n\nNCERT SOURCE MATERIAL. Use ONLY facts, definitions, values and terms found in this text. "
+def _ctx(context, grade=None):
+    note = getattr(context, "note", "")
+    note = (f"NOTE: {note} Use only what a Class {grade or 'N'} learner can follow; leave out the rest. ") if note else ""
+    return ("\n\nNCERT SOURCE MATERIAL. " + note + "Use ONLY facts, definitions, values and terms found in this text. "
             "If something you would like to show is not in it, leave it out — do not fill gaps from memory. "
             "The topic above is fixed: passages here about other topics are search noise, ignore them; "
             "never switch to the topic of the source:\n"
@@ -148,13 +152,13 @@ def _ctx(context):
 
 
 def _plan_prompt(topic, grade, context):
-    return (f"Topic: {topic}\nGrade: {grade or 'infer from topic'}\n{_ctx(context)}\n"
+    return (f"Topic: {topic}\nGrade: {grade or 'infer from topic'}\n{_ctx(context, grade)}\n"
             f"Design the Lab app blueprint.\n\n{LAB_RULES}\n\n"
             f"Emit exactly this JSON shape:\n{PLAN_SCHEMA}")
 
 
 def _build_prompt(topic, grade, context, plan=None):
-    head = f"Topic: {topic}\nGrade: {grade or 'infer from topic'}\n{_ctx(context)}"
+    head = f"Topic: {topic}\nGrade: {grade or 'infer from topic'}\n{_ctx(context, grade)}"
     if plan:
         head += ("\nBLUEPRINT — implement it exactly. Copy its text (app, presets, steps, questions, words, finish) "
                  "verbatim, use its equations, values and step visuals; do not invent different science. "
@@ -360,10 +364,6 @@ def verify_evidence(plan, context):
     return len(quotes), sum(1 for q in quotes if _norm(q).rstrip(".") in src)
 
 
-_GENERIC = {"working", "mechanism", "process", "experiment", "principle", "structure", "introduction",
-            "basics", "types", "properties", "applications", "application", "concept", "study"}
-
-
 def on_topic(topic, plan):
     """False when a blueprint is plainly about something else (a 'Projectile Motion' request that
     came back as an Ohm's-law lab). Compared on 4-letter stems of the topic's own words: the
@@ -378,15 +378,18 @@ def on_topic(topic, plan):
 
 
 def grounding(topic, grade, use_rag):
-    """NCERT text for a topic. RAG asked for but not delivered (no DSN, DB down, nothing on the
-    topic) raises NCERTError: 'grounded' must never silently mean 'ungrounded'."""
+    """NCERT text for a topic, only chunks that are about it. RAG asked for but not delivered (no DSN,
+    DB down, nothing in NCERT on the topic) raises NCERTError: 'grounded' must never silently mean
+    'ungrounded', and a wrong-topic passage must never be passed off as the topic."""
     if not use_rag:
         return ""
-    ctx = ncert_context(topic, grade)
-    if not ctx:
-        raise NCERTError(f"No NCERT text found for {topic!r} (grade {grade or 'any'}); set NCERT_DSN, "
-                         "or generate ungrounded (--no-rag / untick NCERT grounding).")
-    return ctx
+    g = ncert_ground(topic, grade)
+    if not g.chunks:
+        near = f" Closest sections, rejected as passing mentions: {'; '.join(g.closest)}." if g.closest else ""
+        raise NCERTError(f"No NCERT section is about {topic!r} (grade {grade or 'any'}).{near} Reword it the way "
+                         "NCERT does (e.g. 'Electric motor' for 'DC motor'), or check NCERT_DSN, or generate "
+                         "ungrounded (--no-rag / untick NCERT grounding).")
+    return g.context()
 
 
 def blueprint(topic, grade, teacher, use_rag=True, force=False):
@@ -410,6 +413,10 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
         usages.append(u)
         try:
             plan = extract_json(raw)
+            if context and str(plan.get("source_covers_topic", "")).lower().startswith("none"):
+                heads = "; ".join(c.strip().split("\n")[0][:60] for c in context.split("\n\n---\n\n"))
+                raise NCERTError(f"The NCERT text found isn't about {topic!r}: the teacher read it and says it "
+                                 f"covers none of the topic. Sections retrieved: {heads}.")
             quoted, verified = verify_evidence(plan, context) if context else (0, 0)
             if context and not verified:
                 raise ValueError("blueprint quotes no NCERT text: evidence missing or not found in the source")
@@ -421,6 +428,8 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
                 raise
     rec = {"schema": SCHEMA_VERSION, "topic": topic, "grade": grade, "teacher": teacher, "model": usages[-1].model,
            "rag": bool(context), "evidence": {"quoted": quoted, "verified": verified} if context else None,
+           "grounding": {"covers": plan.get("source_covers_topic"), "grades": list(getattr(context, "grades", ())),
+                         "note": getattr(context, "note", "")} if context else None,
            "created": time.strftime("%Y-%m-%d %H:%M"),
            "cost_usd": round(sum(u.cost_usd for u in usages), 6),
            "in_tokens": sum(u.in_tokens for u in usages),
@@ -430,6 +439,11 @@ def blueprint(topic, grade, teacher, use_rag=True, force=False):
                   json.dumps(rec, indent=2, ensure_ascii=False))
     rec["file"] = p.stem
     return rec, usages
+
+
+class BuildError(ValueError):
+    """A builder gave a broken script even after the repair call. Carries the calls already paid for."""
+    usages = ()
 
 
 def _build(alias, role, prompt):
@@ -444,7 +458,9 @@ def _build(alias, role, prompt):
         if not err:
             return page, usages
         if attempt == 2:
-            raise ValueError(f"{alias} built a broken TOPIC script: {err}")
+            e = BuildError(f"{alias} built a broken TOPIC script: {err}")
+            e.usages = usages
+            raise e
         cut = u.finish == "length" or not (js or "").rstrip().endswith(("}", ";", ")", "]"))
         fix = (f"\n\nYOUR PREVIOUS ATTEMPT FAILED: {err}."
                + (" It was cut off before the end. Write the COMPLETE script again, more compactly: "
@@ -454,19 +470,98 @@ def _build(alias, role, prompt):
         usages.append(u)
 
 
+TIERS = ("easy", "medium", "hard")
+# which student builds each tier; override in .env: STUDENT_EASY / STUDENT_MEDIUM / STUDENT_HARD
+TIER_STUDENT = {"easy": "musespark13c", "medium": "gemini38flash", "hard": "opus55"}
+AUTO = "auto"       # as the student alias: pick the student by difficulty
+
+
+def tier_student(tier):
+    return os.getenv(f"STUDENT_{tier.upper()}") or TIER_STUDENT[tier]
+
+
+_DYNAMICS = re.compile(r"ray|lens|mirror|prism|refract|reflect|vector|force|motion|pendulum|circuit|current|wave|"
+                       r"field|electro|magnet|motor|generator|gravit|pressure|heat|reaction", re.I)
+_HARD = re.compile(r"induction|interference|diffraction|projectile|rotat|torque|oscillat|doppler|thermodynamic|"
+                   r"kinetic theory|orbit|semiconductor|quantum|alternating|resonan|polari|collision|"
+                   r"relativ|nuclear|moment of inertia|angular", re.I)
+
+
+def estimate_tier(topic, grade=None, context=""):
+    """Difficulty of BUILDING the simulation, guessed before any model is paid: (tier, reasons).
+    Points for the class (11-12 = 2, 9-10 = 1), for continuous-physics/geometry words in the topic (1) or
+    hard-physics words (2), and, if the NCERT text is passed, for how equation-heavy it is (per 1000
+    chars: 6+ '=' or '$' = 2, 2+ = 1). 0-1 easy, 2-3 medium, 4+ hard. A cheap prior, not a verdict: the
+    blueprint can only raise it (final_tier) and a broken build escalates (_build_tiered)."""
+    why, pts = [], 0
+    g = grade or int((re.search(r"class\s*(\d+)", topic or "", re.I) or [0, 0])[1]) or 0
+    if g >= 11:
+        pts += 2; why.append(f"class {g}")
+    elif g >= 9:
+        pts += 1; why.append(f"class {g}")
+    if _HARD.search(topic or ""):
+        pts += 2; why.append("hard-physics topic")
+    elif _DYNAMICS.search(topic or ""):
+        pts += 1; why.append("continuous physics / geometry")
+    if context:
+        load = (context.count("=") + context.count("$")) / max(len(context), 1) * 1000
+        n = 2 if load >= 6 else 1 if load >= 2 else 0
+        if n:
+            pts += n; why.append(f"equation-heavy source ({load:.0f}/1000 chars)")
+    return ("easy" if pts <= 1 else "medium" if pts <= 3 else "hard"), why
+
+
+def _build_tiered(tier, prompt):
+    """Build with the tier's student; a broken script moves up to the next tier (never down). Returns
+    (html, [Usage]) with every attempt's cost, including the failed ones."""
+    used = []
+    for t in TIERS[TIERS.index(tier):]:
+        try:
+            page, bu = _build(tier_student(t), "student", prompt)
+            return page, used + bu
+        except BuildError as e:
+            used += e.usages
+            err = e
+    err.usages = used
+    raise err
+
+
+def final_tier(pre, plan):
+    """The blueprint can raise the pre-blueprint estimate, never lower it: by the teacher's own
+    build_tier, and by how many equations the model has to implement (2+ medium, 5+ hard)."""
+    t = str((plan or {}).get("build_tier", "")).strip().lower()
+    n = len(((plan or {}).get("science") or {}).get("equations") or [])
+    by_eq = "hard" if n >= 5 else "medium" if n >= 2 else "easy"
+    return max(pre, t if t in TIERS else pre, by_eq, key=TIERS.index)
+
+
 def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True):
-    """mode in {teacher_only, student_only, teacher_student}.
-    Returns (html, plan_or_None, [Usage]) — usages are only calls made in this run."""
+    """mode in {teacher_only, student_only, teacher_student}. student == "auto" picks the student by
+    difficulty (estimate_tier + the blueprint's build_tier -> STUDENT_EASY/MEDIUM/HARD); in
+    teacher_student with HARD_SINGLE=1 a topic estimated hard skips the blueprint and one frontier
+    call builds it whole. Returns (html, plan_or_None, [Usage]) — only calls made in this run."""
+    auto = student == AUTO
     if mode == "teacher_student":
+        pre = estimate_tier(topic, grade)[0]     # topic + class only: costs nothing, needs no database
+        if auto and pre == "hard" and os.getenv("HARD_SINGLE", "").lower() in ("1", "true", "yes"):
+            html_out, bu = _build(tier_student("hard"), "student",
+                                  _build_prompt(topic, grade, grounding(topic, grade, use_rag)))
+            return html_out, None, bu
         rec, usages = blueprint(topic, grade, teacher, use_rag, force=not reuse_blueprint)
         # The blueprint already carries the grounded facts, so the student doesn't
         # re-pay for the NCERT context. That is where most of the saving comes from.
-        html_out, bu = _build(student, "student", _build_prompt(topic, grade, "", rec["plan"]))
+        prompt = _build_prompt(topic, grade, "", rec["plan"])
+        if auto:
+            html_out, bu = _build_tiered(final_tier(pre, rec["plan"]), prompt)
+        else:
+            html_out, bu = _build(student, "student", prompt)
         return html_out, rec["plan"], usages + bu
 
     context = grounding(topic, grade, use_rag)
     if mode in ("teacher_only", "student_only"):
         alias, role = (teacher, "teacher") if mode == "teacher_only" else (student, "student")
+        if alias == AUTO:
+            alias = tier_student(estimate_tier(topic, grade, context)[0])
         html_out, bu = _build(alias, role, _build_prompt(topic, grade, context))
         return html_out, None, bu
 

@@ -106,11 +106,36 @@ curl -s https://openrouter.ai/api/v1/models | grep -o '"id":"[^"]*"'
 
 ## NCERT grounding
 
-Set `NCERT_DSN` to your Postgres DSN. Retrieval is plain full-text search
-(`to_tsvector`/`plainto_tsquery`/`ts_rank`) — no embedding model, no vector column.
-The query itself lives in `NCERT_SQL` so nothing here assumes your schema; the default
-expects `ncert_chunks(content text, grade int)`. Named params: `%(q)s` (raw topic
-text), `%(grade)s`, `%(k)s`. Leave `NCERT_DSN` empty to run ungrounded.
+Set `NCERT_DSN` to your Postgres DSN (default query reads `knowledge_graph.graph_nodes (ground_truth_content,
+class_level)`; override with `NCERT_SQL`, which must return the text and, optionally, the class). Leave
+`NCERT_DSN` empty to run ungrounded. Grounding is fail-closed: if it was asked for and not delivered,
+generation stops with an error instead of producing an ungrounded or wrong-topic sim.
+
+Full-text search only says the topic's words occur *somewhere* in a chunk, which is how a page on motor neurons
+answers "Working of DC Motor". So retrieval has layers, each cutting off one kind of wrong topic:
+
+1. **Subject words only**: `keywords()` keeps acronyms (`DC`, `AC`, `pH`) and `core_keywords()` drops lesson-kind
+   words ("working", "mechanism") that a chunk about the subject needn't contain.
+2. **Relevance score** (`retrieve.relevance`): heading share + whether the words sit together + how often they
+   occur. Passing mentions, bare figure stubs and Summary/Exercise chunks fall below `CORE_SCORE` and are never shown
+   to the teacher.
+3. **One class, said out loud**: if nothing in the asked class is about the topic, all classes are searched and the
+   text of the single best class is used, with a note ("NCERT teaches this in Class 12, not Class 10") given to the
+   teacher and stored in the blueprint's `grounding`.
+4. **Nothing is about it** -> error naming the closest rejected sections and suggesting NCERT's own wording.
+5. **The teacher checks too**: the blueprint states `source_covers_topic` (full/partial/none); `none` stops the run.
+   Its `evidence` quotes must also occur verbatim in the retrieved text.
+
+`python test_ncert.py` runs these against a throwaway Postgres, and against your real DB (`NCERT_DSN`) prints, for the
+first 15 topics in `topics.txt`, the class each came from and a reason when one is not grounded.
+
+## Difficulty routing
+
+Pick **auto (by difficulty)** as the student (or `--student auto`). `estimate_tier()` guesses easy/medium/hard
+before any model is paid (class, physics keywords in the topic); the blueprint can only raise it (the teacher's
+`build_tier`, number of equations); a student whose script won't build moves the run up a tier instead of failing.
+Students per tier: `STUDENT_EASY` / `STUDENT_MEDIUM` / `STUDENT_HARD` (defaults Muse Spark 1.3c / Gemini 3.8 Flash /
+Opus 5.5). With `HARD_SINGLE=1` a topic estimated hard skips the blueprint and `STUDENT_HARD` builds it in one call.
 
 ## Checks
 
