@@ -166,8 +166,6 @@ table.bp a{color:var(--accent)}
     @@ACCESS_FIELD@@
     <div class="actions">
       <fieldset>
-        <label><input type="checkbox" name="modes" value="teacher_only" @@M_TO@@> teacher_only</label>
-        <label><input type="checkbox" name="modes" value="student_only" @@M_SO@@> student_only</label>
         <label><input type="checkbox" name="modes" value="teacher_student" @@M_TS@@> teacher_student</label>
         <label><input type="checkbox" name="modes" value="blueprint" @@M_BP@@> blueprint only</label>
       </fieldset>
@@ -434,8 +432,6 @@ def render(topic="", grade="", teacher=None, student=None, modes=("teacher_stude
         "@@TEACHER_OPTS@@": model_options("teacher", teacher or os.environ["TEACHER"]),
         "@@STUDENT_OPTS@@": model_options("student", student or pipeline.AUTO),
         "@@RAG@@": "checked" if rag else "",
-        "@@M_TO@@": "checked" if "teacher_only" in modes else "",
-        "@@M_SO@@": "checked" if "student_only" in modes else "",
         "@@M_TS@@": "checked" if "teacher_student" in modes else "",
         "@@M_BP@@": "checked" if "blueprint" in modes else "",
         "@@REUSE@@": "checked" if reuse else "",

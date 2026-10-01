@@ -1,5 +1,4 @@
-"""Three routes from a class topic to a runnable HTML simulation, so they can be
-compared on the same topic: teacher_only, student_only, teacher_student.
+"""Class topic -> runnable HTML simulation: a teacher model writes a blueprint, a student model builds it.
 
 teacher_student reuses a stored blueprint (blueprints/<slug>.json) when one exists,
 so the frontier model is paid once per topic and every later build is student-only cost.
@@ -328,8 +327,7 @@ def write_new(directory, stem, ext, text):
 
 def run_name(mode, teacher, student):
     """File stem for one generated simulation: <mode>__<models>__<timestamp>."""
-    models = {"teacher_only": teacher, "student_only": student}.get(mode, f"{teacher}-{student}")
-    return f"{mode}__{slug(models)}__{stamp()}"
+    return f"{mode}__{slug(f'{teacher}-{student}')}__{stamp()}"
 
 
 def blueprint_files(topic=None, teacher=None):
@@ -545,7 +543,7 @@ def _tag(usages, tier):
 
 
 def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True):
-    """mode in {teacher_only, student_only, teacher_student}. student == "auto" picks the student by
+    """mode: only "teacher_student". student == "auto" picks the student by
     difficulty (estimate_tier + the blueprint's build_tier -> STUDENT_EASY/MEDIUM/HARD); in
     teacher_student with HARD_SINGLE=1 a topic estimated hard skips the blueprint and one frontier
     call builds it whole. Returns (html, plan_or_None, [Usage]) — only calls made in this run."""
@@ -564,17 +562,10 @@ def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True
         html_out, bu = _build_tiered(tier, prompt) if auto else _build(student, "student", prompt)
         return html_out, rec["plan"], _tag(usages + bu, tier)
 
-    context = grounding(topic, grade, use_rag)
-    if mode in ("teacher_only", "student_only"):
-        alias, role = (teacher, "teacher") if mode == "teacher_only" else (student, "student")
-        tier = estimate_tier(topic, grade, context)[0]
-        html_out, bu = _build(tier_student(tier) if alias == AUTO else alias, role, _build_prompt(topic, grade, context))
-        return html_out, None, _tag(bu, tier)
-
     raise ValueError(f"unknown mode {mode}")
 
 
-MODES = ("teacher_only", "student_only", "teacher_student")
+MODES = ("teacher_student",)
 
 
 # ---------------------------------------------------------------- judge

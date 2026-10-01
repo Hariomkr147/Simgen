@@ -125,7 +125,7 @@ def test_topic_spliced_into_shell():
 
 
 def test_pipeline_modes_and_token_split():
-    """teacher_student must bill two calls; student_only one. Fake transport, no network."""
+    """teacher_student bills a teacher call and a student call. Fake transport, no network."""
     seen = []
 
     def fake(alias, system, user, max_tokens=0):
@@ -139,16 +139,12 @@ def test_pipeline_modes_and_token_split():
         assert seen == ["t", "s"] and len(us) == 2 and plan["grade"] == 9
         assert [u.role for u in us] == ["teacher", "student"]
         assert pipeline.static_checks(html)["lab_shell"]
-        cheap = sum(u.cost_usd for u in us)
-
-        seen.clear()
-        _, _, us_t = pipeline.run("teacher_only", "Pendulum", 9, "t", "s", use_rag=False)
-        assert seen == ["t"] and len(us_t) == 1
-        assert sum(u.cost_usd for u in us_t) > cheap, "teacher_only should cost more than teacher->student"
-
-        seen.clear()
-        _, _, us_s = pipeline.run("student_only", "Pendulum", 9, "t", "s", use_rag=False)
-        assert seen == ["s"]
+        for gone in ("teacher_only", "student_only"):
+            try:
+                pipeline.run(gone, "Pendulum", 9, "t", "s", use_rag=False)
+                raise AssertionError(f"{gone} was removed")
+            except ValueError as e:
+                assert "unknown mode" in str(e)
     finally:
         llm.TRANSPORT = None
 

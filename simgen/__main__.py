@@ -56,7 +56,6 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="simgen")
     ap.add_argument("topic", help='e.g. "Class 9 Science: Simple Pendulum"')
     ap.add_argument("--grade", type=int)
-    ap.add_argument("--modes", default="all", help="comma list or 'all': " + ",".join(pipeline.MODES))
     ap.add_argument("--teacher", default=os.getenv("TEACHER", "opus5"))
     ap.add_argument("--student", default=os.getenv("STUDENT", "auto"),
                     help="model alias, or 'auto' to pick by difficulty (STUDENT_EASY/MEDIUM/HARD)")
@@ -70,7 +69,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     load_env()
-    modes = pipeline.MODES if a.modes == "all" else tuple(m.strip() for m in a.modes.split(","))
+    modes = pipeline.MODES
     d = Path(a.out) / slug(a.topic)
     d.mkdir(parents=True, exist_ok=True)
     rows = []

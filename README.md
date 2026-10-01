@@ -1,13 +1,9 @@
 # simgen — teacher→student simulation pipeline (prototype)
 
-Input: a class topic. Output: a self-contained interactive HTML simulation, plus a
-cost/quality report comparing three routes to it.
-
-| route | what happens | what it tells you |
-|---|---|---|
-| `teacher_only` | frontier model writes the whole sim | quality ceiling + cost ceiling |
-| `student_only` | small model writes the whole sim | cost floor + quality floor |
-| `teacher_student` | frontier model writes a JSON blueprint, small model implements it | the actual proposal |
+Input: a class topic. Output: a self-contained interactive HTML simulation and its cost report.
+A frontier **teacher** model writes a JSON blueprint (once per topic, stored and reused); a small **student**
+model implements it. The earlier `teacher_only` / `student_only` routes were removed: they were cost-experiment
+baselines, and `HARD_SINGLE` covers the one-model case.
 
 ## Simulation format: the Lab app
 
@@ -43,11 +39,9 @@ python dryrun.py "Class 9 Science: Simple Pendulum" --grade 9   # wiring check, 
 python -m simgen "Class 9 Science: Simple Pendulum" --grade 9 --judge
 ```
 
-Writes `runs/<topic-slug>/{teacher_only,student_only,teacher_student}.html`,
-`teacher_student.plan.json`, `report.json`, `report.md`. Open the HTML files in a
-browser side by side — that is the real quality comparison.
+Writes `runs/<topic-slug>/teacher_student__<models>__<time>.html` plus `report__<time>.json` and `.md`.
 
-Useful flags: `--modes teacher_student` · `--teacher astra6` · `--student gemini38flash`
+Useful flags: `--teacher astra6` · `--student gemini38flash`
 · `--no-rag` · `--project 50000` (queries to project cost over).
 
 ## Live test UI
@@ -60,24 +54,6 @@ Pick a topic, grade and mode(s), hit Generate. Each mode's simulation renders li
 an iframe so you can actually play with it, with its measured cost/time/checks above
 it. A request blocks for as long as the real model call takes (30s–2min) — that's the
 browser's own spinner, no JS needed. Runs are written to `runs/` same as the CLI.
-
-## GeoGebra routes
-
-Two extra buttons in the live UI; the student writes GeoGebra commands (JSON, ~1-2k tokens)
-instead of a whole HTML/JS sim, and GeoGebra does the maths and drawing. Best for maths,
-ray optics, kinematics — keep the canvas routes for biology/chemistry.
-
-| button | mode | calls |
-|---|---|---|
-| GeoGebra + blueprint | `geogebra` | stored teacher blueprint (reused) + 1 student call |
-| GeoGebra direct | `geogebra_direct` | 1 student call, NCERT context in the prompt, writes its own questions |
-
-A spec that fails `geogebra.checks()` gets one repair call. Commands GeoGebra rejects at runtime
-are shown in red on the page. GeoGebra itself is served offline from `static/geogebra/`
-(the [Math Apps Bundle](https://download.geogebra.org/package/geogebra-math-apps-bundle));
-`GGB_CODEBASE` overrides it. CLI: `--modes geogebra` / `geogebra_direct`, but open the result
-through `app.py` (`/sim/...`) — a file:// page can't reach `/static/geogebra/`.
-GeoGebra is free for non-commercial use only: https://www.geogebra.org/license
 
 ## Configuration
 
