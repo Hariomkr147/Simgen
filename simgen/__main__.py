@@ -62,6 +62,8 @@ def main(argv=None):
     ap.add_argument("--judge", action="store_true", help="grade each output with JUDGE model (costs extra)")
     ap.add_argument("--judge-model", default=os.getenv("JUDGE", "opus5"))
     ap.add_argument("--no-rag", action="store_true", help="skip NCERT retrieval")
+    ap.add_argument("--narrate", default="", help="spoken audio: en, hi (Hinglish) or en,hi")
+    ap.add_argument("--tts", default="gemini", choices=["gemini", "sarvam"], help="voice for --narrate")
     ap.add_argument("--fresh-blueprint", action="store_true",
                     help="regenerate the teacher blueprint even if one is stored in blueprints/")
     ap.add_argument("--out", default="runs")
@@ -95,6 +97,14 @@ def main(argv=None):
             "checks": pipeline.static_checks(html),
             "bytes": len(html),
         }
+        if a.narrate:
+            try:
+                from . import tts
+                _, nus = tts.narrate(html, f.with_suffix(".audio"), a.tts, tuple(a.narrate.split(",")), a.grade)
+                row["narration_cost_usd"] = sum(u.cost_usd for u in nus)
+                row["cost_usd"] += row["narration_cost_usd"]
+            except Exception as e:
+                print(f"[{mode}] narration failed: {e}", file=sys.stderr)
         if a.judge:
             try:
                 row["judge"], ju = pipeline.judge(html, a.topic, a.grade, a.judge_model)

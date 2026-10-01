@@ -14,9 +14,9 @@ import time
 from pathlib import Path
 from urllib.parse import urlencode
 
-from flask import Flask, Response, make_response, request
+from flask import Flask, Response, make_response, redirect, request, send_file
 
-from simgen import pipeline
+from simgen import pipeline, tts as speech
 from simgen.__main__ import load_env, slug
 
 load_env()
@@ -163,6 +163,13 @@ table.bp a{color:var(--accent)}
         <label style="text-transform:none;display:flex;align-items:center;gap:.4rem">
           <input type="checkbox" name="reuse" @@REUSE@@ style="width:auto"> reuse stored blueprint</label></div>
     </div>
+    <div class="row3">
+      <div class="field"><label for="tts">Voice (TTS) model</label>
+        <select id="tts" name="tts">@@TTS_OPTS@@</select></div>
+      <div class="field"><label for="narrate">Narration</label>
+        <select id="narrate" name="narrate">@@NARRATE_OPTS@@</select></div>
+      <div class="field"><label>&nbsp;</label><span class="hint">Spoken coach lines, questions and answers (about &#8377;6&ndash;15 per language). Hinglish is written by an extra model call.</span></div>
+    </div>
     @@ACCESS_FIELD@@
     <div class="actions">
       <fieldset>
@@ -212,10 +219,24 @@ def model_options(kind, selected):
     return "".join(opts)
 
 
+NARRATE_CHOICES = {"none": ((), "none"), "en": (("en",), "English"), "hi": (("hi",), "Hinglish"),
+                   "both": (("en", "hi"), "English + Hinglish")}
+
+
+def tts_options(selected):
+    return "".join(f'<option value="{k}"{" selected" if k == selected else ""}>{html.escape(v)}</option>'
+                   for k, v in speech.PROVIDERS.items())
+
+
+def narrate_options(selected):
+    return "".join(f'<option value="{k}"{" selected" if k == selected else ""}>{html.escape(v[1])}</option>'
+                   for k, v in NARRATE_CHOICES.items())
+
+
 def model_tags(models):
     """[{role, model, in_tokens, out_tokens, cached_tokens, cost_source}, ...] -> compact
     tags naming which model actually generated the output, with tokens/cache on hover."""
-    role_short = {"teacher": "T", "student": "S", "judge": "J", "refine": "R"}
+    role_short = {"teacher": "T", "student": "S", "judge": "J", "refine": "R", "tts": "V", "narration": "N"}
     tags = []
     for m in models or []:
         alias, _, mid = str(m.get("model", "")).partition(":")
@@ -295,12 +316,13 @@ def render_blueprints(recs):
       teacher_student then reuses that teacher's newest blueprint and only pays for the student.</p>"""
 
 
-def cost_split(rec, fresh, student_cost, judge_cost=0):
+def cost_split(rec, fresh, student_cost, judge_cost=0, narr_cost=0):
     """Blueprint vs student-build (vs judge) cost line for a teacher_student result."""
     bp = rec.get("cost_usd") or 0
     how = "generated now" if fresh else f"stored, reused (made {html.escape(rec.get('created', ''))})"
-    this_run = student_cost + judge_cost + (bp if fresh else 0)
-    judge_part = f'<span>Judge <b>{money(judge_cost)}</b></span>' if judge_cost else ""
+    this_run = student_cost + judge_cost + narr_cost + (bp if fresh else 0)
+    judge_part = (f'<span>Judge <b>{money(judge_cost)}</b></span>' if judge_cost else "") + \
+                 (f'<span>Narration <b>{money(narr_cost)}</b></span>' if narr_cost else "")
     return (f'<div class="split"><span>Blueprint <b>{money(bp)}</b> · {how}</span>'
             f'<span>Student build <b>{money(student_cost)}</b></span>{judge_part}'
             f'<span>This run <b>{money(this_run)}</b></span></div>')
@@ -431,6 +453,8 @@ def render(topic="", grade="", teacher=None, student=None, modes=("teacher_stude
         "@@TOPIC@@": html.escape(topic), "@@GRADE@@": html.escape(str(grade)),
         "@@TEACHER_OPTS@@": model_options("teacher", teacher or os.environ["TEACHER"]),
         "@@STUDENT_OPTS@@": model_options("student", student or pipeline.AUTO),
+        "@@TTS_OPTS@@": tts_options(request.form.get("tts") or speech.DEFAULT_PROVIDER),
+        "@@NARRATE_OPTS@@": narrate_options(request.form.get("narrate") or "en"),
         "@@RAG@@": "checked" if rag else "",
         "@@M_TS@@": "checked" if "teacher_student" in modes else "",
         "@@M_BP@@": "checked" if "blueprint" in modes else "",
@@ -458,6 +482,8 @@ def run():
     teacher = request.form.get("teacher") or os.environ["TEACHER"]
     student = request.form.get("student") or pipeline.AUTO
     modes = request.form.getlist("modes") or ["teacher_student"]
+    provider = request.form.get("tts") or speech.DEFAULT_PROVIDER
+    langs = NARRATE_CHOICES.get(request.form.get("narrate") or "en", NARRATE_CHOICES["en"])[0]
     use_rag = bool(request.form.get("rag"))
     reuse = bool(request.form.get("reuse"))
     run_slug = slug(topic)
@@ -544,6 +570,19 @@ def run():
         checks = pipeline.static_checks(out_html)
         passed, total = sum(checks.values()), len(checks)
 
+        # Narration is an add-on: a failure (no key, provider down) never loses the simulation.
+        narr_note, narr_cost = "", 0
+        if langs:
+            try:
+                _, nus = speech.narrate(out_html, RUNS / run_slug / f"{name}.audio", provider, langs, g)
+                models += [call_rec(u) for u in nus]
+                narr_cost = sum(u.cost_usd for u in nus)
+                cost += narr_cost; secs += sum(u.seconds for u in nus)
+                narr_note = (f'<span class="hint">narrated ({" + ".join(speech.LANGS[l] for l in langs)}, '
+                             f'{html.escape(speech.PROVIDERS[provider])})</span>')
+            except Exception as e:
+                narr_note = f'<span class="checks-bad" title="{html.escape(str(e))}">narration failed</span> <span class="hint">{html.escape(str(e)[:160])}</span>'
+
         split, extra = "", {}
         if mode == "teacher_student" and plan is not None:   # plan None: hard topic built whole by one model
             rec = pipeline.load_blueprint(topic, teacher) or {}  # the one run() just used
@@ -554,11 +593,12 @@ def run():
                                   "in_tokens": rec.get("in_tokens", 0), "out_tokens": rec.get("out_tokens", 0),
                                   "cost_usd": rec.get("cost_usd"), "seconds": rec.get("seconds"),
                                   "cost_source": "stored blueprint"})
-            split = cost_split(rec, fresh, student_cost, judge_cost)
+            split = cost_split(rec, fresh, student_cost, judge_cost, narr_cost)
             extra = {"blueprint_cost_usd": rec.get("cost_usd"), "blueprint_reused": not fresh,
                      "blueprint_file": rec.get("file"),
                      "student_cost_usd": student_cost}
-        log_run({"ts": time.time(), "slug": run_slug, "mode": mode, "topic": topic,
+        log_run({"ts": time.time(), "slug": run_slug, "mode": mode, "topic": topic, "tts": provider if langs else None,
+                 "narration_cost_usd": narr_cost,
                  "grade": g, "teacher": teacher, "student": student,
                  "cost_usd": cost, "seconds": secs, "checks_passed": passed, "checks_total": total,
                  "models": models, "rag": use_rag, "file": name,
@@ -574,6 +614,7 @@ def run():
               <span class="{checks_cls}">{passed}/{total} checks</span>
               {tier_badge(tier)}
               {confidence_badge(confidence, (scores or {}).get("verdict"))}
+              {narr_note}
               {f'<span class="hint">revised once: {refined["before"]}% &rarr; {refined["after"]}%' + ('' if refined["kept"] else ' (kept the original)') + '</span>' if refined else ''}
             </div>
           </div>
@@ -642,7 +683,8 @@ def download(run_slug, name):
     src = RUNS / run_slug / f"{name}.html"
     if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not src.exists():
         return "not found", 404
-    resp = Response(src.read_bytes(), mimetype="text/html")
+    resp = Response(speech.with_narration(src.read_text(encoding="utf-8"), narration_for(run_slug, name, inline=True)),
+                    mimetype="text/html")
     resp.headers["Content-Disposition"] = f'attachment; filename="{run_slug}__{name}.html"'
     return resp
 
@@ -654,6 +696,22 @@ ROLE = {"teacher": "Teacher", "student": "Student", "judge": "Judge"}
 def run_entry(run_slug, name):
     """The library.jsonl entry for one generated file (older entries key by mode)."""
     return load_meta().get(run_slug, {}).get(name, {})   # legacy <mode>.html: stem == mode == key
+
+
+def narration_panel(run_slug, name):
+    """What narration this simulation has, and a form to add or refresh it (also for older simulations)."""
+    man = speech.read_manifest(RUNS / run_slug / f"{name}.audio")
+    langs = man.get("langs") or {}
+    have = "".join(detail_row(html.escape(v["label"]), f'{len(v["clips"])} clips &middot; {html.escape(speech.PROVIDERS.get(v["provider"], v["provider"]))}'
+                              f' <span class="hint">voice {html.escape(v["voice"])}</span>') for v in langs.values())
+    spent = f'{detail_row("Narration cost", money(man["spent_usd"]) + " <span class=hint>(estimated)</span>")}' if man.get("spent_usd") else ""
+    code = ('<input name="access_code" type="password" placeholder="access code" style="width:9rem">' if ACCESS_CODE else "")
+    return f"""<div class="panel"><h2>Narration <span class="hint">&mdash; spoken coach lines and questions</span></h2>
+      <div class="tbl-wrap"><table class="bp">{have or detail_row("Audio", "none yet")}{spent}</table></div>
+      <form method="post" action="/narrate/{run_slug}/{name}" style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.7rem;align-items:center">
+        <select name="tts">{tts_options(speech.DEFAULT_PROVIDER)}</select>
+        <select name="narrate">{narrate_options("en")}</select>{code}
+        <button type="submit">{"Refresh" if langs else "Add"} narration</button></form></div>"""
 
 
 def detail_row(k, v):
@@ -761,6 +819,7 @@ def view(run_slug, name):
 <div class="panel"><h2>Model calls</h2><div class="tbl-wrap"><table class="bp">
   <tr><th>Role</th><th>Model</th><th>Tokens in&rarr;out</th><th>Time</th><th>Cost</th><th>Billing</th></tr>
   {calls}</table></div></div>
+{narration_panel(run_slug, name)}
 {judge_html}
 {bp_html}
 <div class="panel"><h2>Run details</h2><div class="tbl-wrap"><table class="bp">
@@ -786,12 +845,48 @@ def costs_page():
             f'<meta name="viewport" content="width=device-width, initial-scale=1">{head}</head><body>{body}</body></html>')
 
 
+def narration_for(run_slug, name, inline=False):
+    """window.NARRATION for a simulation (None if it has no audio): clip URLs, or data: URIs for a download."""
+    d = RUNS / run_slug / f"{name}.audio"
+    obj = speech.narration_object(speech.read_manifest(d),
+                                  lambda lang, k: f"audio/{name}/{lang}/{k}.mp3")   # relative to /sim/<slug>/<name>
+    return speech.inline_audio(obj, d) if inline and obj else obj
+
+
 @app.get("/sim/<run_slug>/<name>")
 def sim(run_slug, name):
     f = RUNS / run_slug / f"{name}.html"
     if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not f.exists():
         return "not found", 404
-    return Response(f.read_text(encoding="utf-8"), mimetype="text/html")
+    return Response(speech.with_narration(f.read_text(encoding="utf-8"), narration_for(run_slug, name)),
+                    mimetype="text/html")
+
+
+@app.get("/sim/<run_slug>/audio/<name>/<lang>/<clip>")
+def sim_audio(run_slug, name, lang, clip):
+    f = RUNS / run_slug / f"{name}.audio" / lang / clip
+    if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name) and lang in speech.LANGS
+            and speech.CLIP_FILE.fullmatch(clip)) or not f.exists():
+        return "not found", 404
+    return send_file(f.resolve(), mimetype="audio/mpeg", max_age=3600)
+
+
+@app.post("/narrate/<run_slug>/<name>")
+def narrate_existing(run_slug, name):
+    """Add (or refresh) narration for a simulation that's already in the library."""
+    f = RUNS / run_slug / f"{name}.html"
+    if not (pipeline.SAFE_NAME.fullmatch(run_slug) and pipeline.SAFE_NAME.fullmatch(name)) or not f.exists():
+        return "not found", 404
+    if ACCESS_CODE and request.form.get("access_code", "").strip() != ACCESS_CODE:
+        return "access code required", 403
+    provider = request.form.get("tts") or speech.DEFAULT_PROVIDER
+    langs = NARRATE_CHOICES.get(request.form.get("narrate") or "en", NARRATE_CHOICES["en"])[0]
+    try:
+        _, nus = speech.narrate(f.read_text(encoding="utf-8"), RUNS / run_slug / f"{name}.audio", provider, langs,
+                                (run_entry(run_slug, name) or {}).get("grade"))
+    except Exception as e:
+        return Response(f"Narration failed: {html.escape(str(e))}", status=502, mimetype="text/plain")
+    return redirect(f"/view/{run_slug}/{name}")
 
 
 if __name__ == "__main__":

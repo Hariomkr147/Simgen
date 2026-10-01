@@ -113,6 +113,28 @@ before any model is paid (class, physics keywords in the topic); the blueprint c
 Students per tier: `STUDENT_EASY` / `STUDENT_MEDIUM` / `STUDENT_HARD` (defaults Muse Spark 1.3c / Gemini 3.8 Flash /
 Opus 5.5). With `HARD_SINGLE=1` a topic estimated hard skips the blueprint and `STUDENT_HARD` builds it in one call.
 
+## Narration (TTS)
+
+Each simulation can speak: the coach line for each step, the question (with its options), the explanation after
+an answer, the Think questions and the finish text. Pick the voice and language beside the model selects
+(default **Gemini 3.8 Flash TTS**, English), or `--tts gemini|sarvam --narrate en,hi` on the CLI.
+
+| voice | how it is called | needs |
+|---|---|---|
+| Gemini 3.8 Flash TTS | OpenRouter `/audio/speech` (`TTS_GEMINI_MODEL`, voice `TTS_GEMINI_VOICE`) | your existing `LLM_API_KEY` |
+| Sarvam Bulbul v3 | `api.sarvam.ai/text-to-speech` (`SARVAM_SPEAKER`, `en-IN` / `hi-IN`) | `SARVAM_API_KEY` |
+
+- **English** speaks the text as written. **Hinglish** is rewritten first by `NARRATION_MODEL` (default
+  `gemini38flash`, one call per simulation): Hindi words in Devanagari, English science terms in Latin script.
+- Clips are MP3 files in `runs/<topic>/<simulation>.audio/<lang>/`, with a `manifest.json`. A line whose text and
+  voice are unchanged is never paid for twice, so "Refresh narration" only pays for what changed.
+- The shell shows a 🔊 on/off button and an English/Hinglish switch when audio exists, plus a small 🔊 next to
+  each question to replay it. A simulation built on an older shell is rebuilt on the current shell when served with audio.
+- **Download** inlines the audio into one HTML file that plays offline. Existing simulations: open
+  `/view/...` and use "Add narration", or `python -m simgen.tts runs/x/y.html --lang en,hi --provider sarvam`.
+- Cost is an estimate (Sarvam Rs 30 per 10,000 characters; Gemini ~$16 per million characters, `TTS_GEMINI_USD_PER_MCHAR`).
+  Not yet run against the live providers: if a voice name or model id is rejected, the error is shown on the card.
+
 ## Judge confidence
 
 The judge (`JUDGE_ENABLED=true`) scores five axes /5 and returns a confidence %. 100% is not a realistic target
