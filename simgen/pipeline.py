@@ -584,7 +584,7 @@ interactivity: do the presets, sliders/toggle and steps change the stage and the
 grade_appropriateness: vocabulary and maths level.
 pedagogy: do the ordered steps, the question after each step and the Think questions teach the concept?
 You are shown only the TOPIC script. It runs inside a fixed shell that already provides preset chips, ordered
-step buttons, a Guide/Challenge coach with a question after each step, a Think tab of 3 questions, a key-words
+step buttons, a Guide (steps with explanations) and a Challenge (a question after each step), a Think tab of 3 questions, a key-words
 sheet, a 4-value HUD, sliders, a toggle, and phone and dark layouts. Do not deduct for what the shell does,
 and judge only what the script adds on top of it. 5 means nothing a teacher would change. Every score below 5
 needs an entry in "issues": a concrete, implementable change to the script (at most 5, most valuable first);
@@ -647,6 +647,11 @@ JEV_AXES = {
     "grade_appropriateness": "is the vocabulary and maths level right for the grade?",
     "pedagogy": "do the observations and questions actually teach the concept?",
 }
+# Jev scores each axis independently and, unlike the chat judge, sees no rubric -- so the rubric's two
+# calibrations go into every question: what the fixed shell already provides, and that 5 is rare.
+JEV_STRICT = ("You see only the TOPIC script; the fixed shell already provides preset chips, step buttons, a "
+              "Guide/Challenge coach, a question per step, Think questions, a HUD, sliders and a toggle, so judge only "
+              "what the script adds. Be strict: 5 only if a teacher would change nothing; a good script is 3 or 4.")
 JEV_SCALE = ["0 - completely wrong or absent", "1 - mostly wrong", "2 - partially right, real gaps",
              "3 - mostly right, minor issues", "4 - right, small polish possible", "5 - fully correct"]
 
@@ -658,7 +663,7 @@ def judge_jev(html, topic, grade):
         "model": model,
         "state": {"topic": topic, "grade": grade, "simulation_source": (topic_of(html) or html)[:60000]},
         "questions": {k: {"type": "score",
-                          "instructions": f'For topic "{topic}" (grade {grade}): {q}',
+                          "instructions": f'For topic "{topic}" (grade {grade}): {q} {JEV_STRICT}',
                           "criteria": JEV_SCALE}
                      for k, q in JEV_AXES.items()},
     }
@@ -668,11 +673,12 @@ def judge_jev(html, topic, grade):
         headers={"Authorization": f"Bearer {os.environ['LLM_API_KEY']}",
                  "Content-Type": "application/json"},
         method="POST")
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=int(os.getenv("JUDGE_TIMEOUT", "90"))) as resp:
         data = json.loads(resp.read())
     scores = {k: data["answers"][k]["score"] for k in JEV_AXES}
     scores["total"] = round(sum(scores.values()), 2)
     weakest = min(JEV_AXES, key=scores.get)
+    scores["issues"] = []        # Jev returns scores, not fixes: nothing for refine() to act on, so it is skipped
     scores["verdict"] = f"Jev score {scores['total']:.1f}/25 (weakest: {weakest.replace('_', ' ')})"
     u = data.get("usage") or {}
     return scores, Usage("judge", f"jev113:{model}", u.get("input_tokens", 0), u.get("output_tokens", 0),

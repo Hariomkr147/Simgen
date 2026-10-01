@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><!--shell:2-->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" id="themeColor" content="#b0226b">
@@ -441,7 +441,9 @@ if(APPC.accent){const d=APPC.accentDark||APPC.accent;
 /* ---------- Narration (optional): window.NARRATION = {lang:{label,clips:{id:url}}}, injected by the server ---------- */
 const NAR=window.NARRATION||{},NL=Object.keys(NAR);let voiceOn=NL.length>0,vLang=NL[0],aud=null;
 function stopSay(){if(aud){aud.pause();aud=null;}}
-function say(id){stopSay();if(!voiceOn)return;const u=(NAR[vLang]||{clips:{}}).clips[id];if(!u)return;aud=new Audio(u);aud.play().catch(()=>{});}
+function say(id){stopSay();if(!voiceOn)return;const u=(NAR[vLang]||{clips:{}}).clips[id];if(!u)return;
+  const a=aud=new Audio(u);a.t0=performance.now();const end=()=>{if(aud===a)aud=null;};a.onended=a.onerror=end;a.play().catch(end);}
+const talking=()=>!!aud&&performance.now()-aud.t0<90000;   // 90s cap: a clip that never loads must not freeze the lesson
 function sayBtn(id){return NL.length?`<button class="say" data-say="${id}" aria-label="Listen" title="Listen">🔊</button>`:"";}
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-say]");if(b){const was=voiceOn;voiceOn=true;say(b.dataset.say);voiceOn=was;}});
 if(NL.length){const bv=$("bVoice"),bl=$("bLang");bv.hidden=false;bl.hidden=NL.length<2;
@@ -476,7 +478,7 @@ function showTab(t){const play=t==="play";stopSay();
   $("scrPlay").hidden=!play;$("scrThink").hidden=play;if(play)requestAnimationFrame(resize);}
 $("tabPlay").onclick=()=>showTab("play");$("tabThink").onclick=()=>showTab("think");
 function openSheet(p,title,body,foot){$("sheetPill").textContent=p;$("sheetTitle").textContent=title;$("sheetBody").innerHTML=body;$("sheetFoot").innerHTML=foot;$("sheet").hidden=false;$("sheetBack").hidden=false;}
-function closeSheet(){stopSay();$("sheet").hidden=true;$("sheetBack").hidden=true;}
+function closeSheet(keep){if(!keep)stopSay();$("sheet").hidden=true;$("sheetBack").hidden=true;}
 $("bInfo").onclick=()=>{
   if(asking)return;if($("scrPlay").hidden)showTab("play");
   openSheet("Key words","Words to know",`<div class="words">${CFG.words.map(w=>`<div class="word"><b>${w.t}</b>${w.d}</div>`).join("")}</div>`,`<button class="btn" id="sheetOk">Got it</button>`);
@@ -515,7 +517,7 @@ function updateHud(){const v=safe("readouts")||[];for(let i=0;i<4;i++){const s=v
 
 /* ---------- Mechanics ---------- */
 function durOf(i){const d=STEPSC[i].dur,v=typeof d==="function"?get(d):d;return clamp(+v||2.3,.3,30);}
-function resetMech(){auto=false;paused=false;playLabel();step=0;anim=null;__banner=null;safe("resetSim");updateActs();if(guided)renderGuide();else renderFree();}
+function resetMech(){auto=false;paused=false;held=null;asking=false;stopSay();playLabel();step=0;anim=null;__banner=null;safe("resetSim");updateActs();if(guided)renderGuide();else renderFree();}
 function tryAct(i){
   if(anim||step>=N||asking||paused)return;
   const btn=ab.children[i];
@@ -536,7 +538,7 @@ function stepSim(dt){
     const i=anim.i;step=i+1;anim=null;updateActs();
     banner(STEPSC[i].result||"Done",false,2);
     if(step===N)banner(CFG.finish.banner||CFG.finish.title||"Complete!",false,2.6);
-    setTimeout(()=>guideEvent(i+1),700);autoAt=performance.now()+1000;
+    setTimeout(()=>stepEvent(i+1),700);autoAt=performance.now()+1000;
     if(!guided)renderFree();
   }
 }
@@ -565,18 +567,35 @@ function renderGuide(){
   const a=STEPSC[step];
   $("gStep").textContent=`Step ${step+1} of ${N} · ${a.name}`;
   $("gDots").innerHTML=STEPSC.map((_,i)=>`<i class="${i<step?"done":i===step?"on":""}"></i>`).join("");$("gDots").hidden=false;
-  $("gDo").innerHTML=(a.do||"")+` Tap <b>${a.name}</b>.`;say("s"+step+".do");
+  $("gDo").innerHTML=(a.do||"")+` Tap <b>${a.name}</b>. `+sayBtn("s"+step+".do");say("s"+step+".do");
   clearHL();$("cA").classList.add("hl");updateActs();
 }
+function stepEvent(done){if(guided)guideEvent(done);else askEvent(done);}
+/* Guide: no questions. After a step, say why it happened (the step's explanation); that is spoken only once the
+   instruction has finished, and the lesson moves on only once it has been heard. Taps are blocked meanwhile. */
+let held=null;
 function guideEvent(done){
-  if(!guided)return;
+  const a=STEPSC[done-1].ask,last=done===N,go=()=>last?finishGuide():renderGuide();
+  if(!a||!a.e){go();return;}
+  $("gStep").textContent=`Step ${done} of ${N} · ${STEPSC[done-1].name}`;
+  $("gDo").innerHTML=a.e+" "+sayBtn("s"+(done-1)+".e");
+  asking=true;updateActs();held={id:"s"+(done-1)+".e",go,t:0,ms:Math.min(9000,Math.max(2500,a.e.length*45))};
+}
+function holdTick(now){
+  if(!held)return;
+  if(held.id){if(talking())return;say(held.id);held.t=now+(aud?400:held.ms);held.id=null;}
+  else if(now>=held.t&&!talking()){const g=held.go;held=null;asking=false;g();}
+}
+/* Challenge: the steps are done unaided; each one is followed by its question (read aloud in full). */
+function askEvent(done){
+  if(guided)return;
   const q=STEPSC[done-1].ask,last=done===N;
-  if(!q){if(last)finishGuide();else renderGuide();return;}
+  if(!q){renderFree();return;}
   asking=true;updateActs();
-  openSheet(`Guide asks · Step ${done}`,q.q,optsHTML(q,"g-"+done),`${sayBtn("s"+(done-1)+".q")}<button class="btn" id="gNext" disabled>${last?"Finish":"Next step →"}</button>`);
+  openSheet(`Challenge · Step ${done}`,q.q,optsHTML(q,"g-"+done),`${sayBtn("s"+(done-1)+".q")}<button class="btn" id="gNext" disabled>${last?"Done":"Next →"}</button>`);
   say("s"+(done-1)+".q");
   $("sheetBody").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{markQ($("sheetBody"),q);$("gNext").disabled=false;say("s"+(done-1)+".e");});
-  $("gNext").onclick=()=>{asking=false;autoAt=performance.now()+500;closeSheet();if(last)finishGuide();else renderGuide();};
+  $("gNext").onclick=()=>{asking=false;closeSheet(true);renderFree();};
 }
 function finishGuide(){
   clearHL();updateActs();
@@ -592,10 +611,10 @@ function finishGuide(){
 function renderFree(){
   $("coachIcon").textContent="FREE";$("gDots").hidden=true;
   $("gStep").textContent=step<N?`Challenge · ${step} of ${N} steps done`:"Challenge complete";
-  $("gDo").innerHTML=step<N?"Do it yourself. Tap the steps in the right order.":"Great! You did every step. Try another option, or go to <b>Think</b>.";
+  $("gDo").innerHTML=step<N?"Do it yourself. Tap the steps in the right order. A question follows each step.":"Great! You did every step. Try another option, or go to <b>Think</b>.";
 }
 function setMode(g){
-  guided=g;asking=false;closeSheet();
+  guided=g;asking=false;held=null;closeSheet();
   $("modeGuided").setAttribute("aria-pressed",g);$("modeFree").setAttribute("aria-pressed",!g);
   clearHL();resetMech();
 }
@@ -610,7 +629,8 @@ $("modeGuided").onclick=()=>setMode(true);$("modeFree").onclick=()=>setMode(fals
 /* ---------- Loop ---------- */
 let last=performance.now();
 function loop(now){const dt=Math.min(.033,(now-last)/1000);last=now;
-  if(auto&&!paused&&!anim&&!asking&&step<N&&now>=autoAt)tryAct(step);
+  holdTick(now);
+  if(auto&&!paused&&!anim&&!asking&&step<N&&now>=autoAt&&!talking())tryAct(step);
   if(auto&&step>=N&&!anim){auto=false;paused=false;playLabel();}
   if(!paused)stepSim(dt);if(!$("scrPlay").hidden){frame();updateHud();}requestAnimationFrame(loop);}
 resize();setMode(true);requestAnimationFrame(loop);

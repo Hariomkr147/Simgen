@@ -106,7 +106,7 @@ def test_page_gets_narration_and_old_shell_is_rebuilt():
     assert obj == {"en": {"label": "English", "clips": {"s0.do": "audio/n/en/s0.do.mp3"}}}
     page = tts.with_narration(HTML, obj)
     assert 'window.NARRATION={"en"' in page and page.count("</head>") == 1 and 'id="bVoice"' in page
-    old = HTML.replace('id="bVoice"', 'id="gone"')                       # a page from before the voice button
+    old = HTML.replace(tts.SHELL_MARK, '')                            # a page saved on an older shell
     assert 'id="bVoice"' in tts.with_narration(old, obj)
     assert tts.with_narration(HTML, None) == HTML
     evil = tts.with_narration(HTML, {"en": {"label": "</script><b>", "clips": {}}})

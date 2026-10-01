@@ -244,12 +244,15 @@ def narration_object(man, url_for):
             for lang, v in (man.get("langs") or {}).items() if v.get("clips")}
 
 
+SHELL_MARK = "<!--shell:2-->"     # bump in shell.html when its behaviour changes: older saved pages are rebuilt
+
+
 def with_narration(html, narration):
-    """The page with window.NARRATION injected. A page built on an older shell (no voice button) is first
+    """The page with window.NARRATION injected. A page built on an older shell is first
     rebuilt on the current shell: the shell is fixed code, only the TOPIC script is the simulation."""
     if not narration:
         return html
-    if 'id="bVoice"' not in html and topic_of(html) is not None:
+    if SHELL_MARK not in html and topic_of(html) is not None:
         html = assemble(topic_of(html))
     blob = json.dumps(narration, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     return html.replace("</head>", f"<script>window.NARRATION={blob};</script>\n</head>", 1)

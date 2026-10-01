@@ -24,7 +24,7 @@ services:
       - key: STUDENT
         value: gemini38flash
       - key: JUDGE
-        value: deepseekv41flash
+        value: jev113
       - key: JUDGE_ENABLED
         value: "true"
       - key: TEACHER_MODELS
