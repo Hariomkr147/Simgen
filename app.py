@@ -130,6 +130,9 @@ table.bp th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spa
 table.bp td{padding:.55rem .5rem;border-bottom:1px solid var(--border);vertical-align:top}
 table.bp td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 table.bp a{color:var(--accent)}
+.tier{font-size:.7rem;font-weight:600;padding:.05rem .5rem;border-radius:99px;white-space:nowrap;
+      border:1px solid currentColor}
+.tier-easy{color:#1a7f4b}.tier-medium{color:#a5690f}.tier-hard{color:#c2362b}
 .pill{font-size:.7rem;padding:.05rem .45rem;border-radius:99px;border:1px solid var(--border);
       color:var(--ink-dim);white-space:nowrap}
 </style></head><body><div class="wrap">
@@ -214,7 +217,7 @@ def model_options(kind, selected):
 def model_tags(models):
     """[{role, model, in_tokens, out_tokens, cached_tokens, cost_source}, ...] -> compact
     tags naming which model actually generated the output, with tokens/cache on hover."""
-    role_short = {"teacher": "T", "student": "S", "judge": "J"}
+    role_short = {"teacher": "T", "student": "S", "judge": "J", "refine": "R"}
     tags = []
     for m in models or []:
         alias, _, mid = str(m.get("model", "")).partition(":")
@@ -226,6 +229,17 @@ def model_tags(models):
             tip += " - estimated price"
         tags.append(f'<span class="model-tag" title="{html.escape(tip)}">{role}-{html.escape(alias)}</span>')
     return "".join(tags)
+
+
+def tier_of(models):
+    """easy | medium | hard from the per-call records (set by pipeline.run), else None."""
+    return next((m.get("tier") for m in models or [] if m.get("tier")), None)
+
+
+def tier_badge(tier):
+    return (f'<span class="tier tier-{tier}" title="How hard this simulation is to build: estimated from the '
+            f'topic and class, raised by the blueprint. Picks the student in auto mode.">{tier} difficulty</span>'
+            if tier in pipeline.TIERS else "")
 
 
 def confidence_badge(pct, verdict=None):
@@ -374,6 +388,7 @@ def library_items(limit=60):
             "bp_cost": e.get("blueprint_cost_usd"), "student_cost": e.get("student_cost_usd"),
             "total": e.get("checks_total"), "mtime": f.stat().st_mtime,
             "confidence": e.get("confidence_pct"), "verdict": (e.get("judge") or {}).get("verdict"),
+            "tier": e.get("tier") or tier_of(e.get("models")),
         })
     return items
 
@@ -402,7 +417,7 @@ def render_library():
             <h4>{html.escape(it['topic'])}</h4>
             <div class="lib-models">{tags}{grade}</div>
             <div class="lib-meta"><span class="stat" title="{split}">{cost}</span><span>{checks} checks</span>
-              {confidence_badge(it["confidence"], it["verdict"])}</div>
+              {tier_badge(it["tier"])}{confidence_badge(it["confidence"], it["verdict"])}</div>
           </a>
           {download_link(it['slug'], it['name'])}
         </div>''')
@@ -417,7 +432,7 @@ def render(topic="", grade="", teacher=None, student=None, modes=("teacher_stude
     for key, val in {
         "@@TOPIC@@": html.escape(topic), "@@GRADE@@": html.escape(str(grade)),
         "@@TEACHER_OPTS@@": model_options("teacher", teacher or os.environ["TEACHER"]),
-        "@@STUDENT_OPTS@@": model_options("student", student or os.environ["STUDENT"]),
+        "@@STUDENT_OPTS@@": model_options("student", student or pipeline.AUTO),
         "@@RAG@@": "checked" if rag else "",
         "@@M_TO@@": "checked" if "teacher_only" in modes else "",
         "@@M_SO@@": "checked" if "student_only" in modes else "",
@@ -445,7 +460,7 @@ def run():
     topic = request.form["topic"].strip()
     grade = request.form.get("grade") or ""
     teacher = request.form.get("teacher") or os.environ["TEACHER"]
-    student = request.form.get("student") or os.environ["STUDENT"]
+    student = request.form.get("student") or pipeline.AUTO
     modes = request.form.getlist("modes") or ["teacher_student"]
     use_rag = bool(request.form.get("rag"))
     reuse = bool(request.form.get("reuse"))
@@ -480,41 +495,64 @@ def run():
                          f'{MODE_LABEL.get(mode, mode)}</span></div><div class="err">{html.escape(str(e))}</div></div>')
             continue
 
-        # one file per generation: a second model on the same topic never replaces the first
-        name = pipeline.write_new(RUNS / run_slug, pipeline.run_name(mode, teacher, student),
-                                  ".html", out_html).stem
+        def call_rec(u):
+            return {"role": u.role, "model": u.model, "in_tokens": u.in_tokens, "out_tokens": u.out_tokens,
+                    "cached_tokens": u.cached_tokens, "cost_source": u.cost_source,
+                    "cost_usd": u.cost_usd, "seconds": u.seconds, "tier": u.tier}
+
+        models = [call_rec(u) for u in usages]
         cost = sum(u.cost_usd for u in usages)
         secs = sum(u.seconds for u in usages)
-        checks = pipeline.static_checks(out_html)
-        passed, total = sum(checks.values()), len(checks)
-        models = [{"role": u.role, "model": u.model, "in_tokens": u.in_tokens, "out_tokens": u.out_tokens,
-                   "cached_tokens": u.cached_tokens, "cost_source": u.cost_source,
-                   "cost_usd": u.cost_usd, "seconds": u.seconds} for u in usages]
+        tier = tier_of(models)
 
         # Grade every generation with the JUDGE model (an LLM examiner, not a human) and
         # surface its rubric total as a 0-100 confidence-of-correctness label. Best-effort:
         # a judging failure (bad JSON, timeout) never breaks the generation itself.
         # JUDGE_ENABLED=false (the default) skips this entirely -- it's an extra paid call
         # on every generation, and Opus 5 judging got expensive fast. Flip it back on in .env.
-        scores, judge_cost = None, 0
+        # A confidence below REFINE_BELOW (default 90) with concrete issues from the judge gets ONE
+        # revision pass by the builder, re-judged; the better of the two is kept (JUDGE_REFINE=false: off).
+        scores, judge_cost, refine_cost, refined = None, 0, 0, None
         if os.environ.get("JUDGE_ENABLED", "false").lower() in ("1", "true", "yes"):
             try:
-                scores, ju = pipeline.judge(out_html, topic, g, os.environ.get("JUDGE", "opus5"))
-                models.append({"role": "judge", "model": ju.model, "in_tokens": ju.in_tokens,
-                               "out_tokens": ju.out_tokens, "cached_tokens": ju.cached_tokens,
-                               "cost_source": ju.cost_source, "cost_usd": ju.cost_usd, "seconds": ju.seconds})
-                cost += ju.cost_usd
-                secs += ju.seconds
-                judge_cost = ju.cost_usd
+                judge_alias = os.environ.get("JUDGE", "opus5")
+                scores, ju = pipeline.judge(out_html, topic, g, judge_alias)
+                models.append(call_rec(ju)); cost += ju.cost_usd; secs += ju.seconds; judge_cost += ju.cost_usd
+                before = pipeline.confidence_pct(scores)
+                if (os.environ.get("JUDGE_REFINE", "true").lower() in ("1", "true", "yes") and scores.get("issues")
+                        and before < int(os.environ.get("REFINE_BELOW", "90")) and pipeline.topic_of(out_html)):
+                    try:
+                        built_by = next((u.model for u in reversed(usages) if u.role in ("student", "teacher")), "")
+                        new_html, ru = pipeline.refine(out_html, topic, g,
+                                                       os.environ.get("REFINE_MODEL") or built_by.partition(":")[0],
+                                                       scores["issues"])
+                        models += [call_rec(u) for u in ru]
+                        refine_cost = sum(u.cost_usd for u in ru)
+                        cost += refine_cost; secs += sum(u.seconds for u in ru)
+                        s2, ju2 = pipeline.judge(new_html, topic, g, judge_alias)
+                        models.append(call_rec(ju2)); cost += ju2.cost_usd; secs += ju2.seconds; judge_cost += ju2.cost_usd
+                        after = pipeline.confidence_pct(s2)
+                        kept = s2["total"] > scores["total"] and all(pipeline.static_checks(new_html).values())
+                        refined = {"before": before, "after": after, "kept": kept}
+                        if kept:
+                            out_html, scores = new_html, s2
+                    except Exception:
+                        pass
             except Exception:
                 pass
         confidence = pipeline.confidence_pct(scores)
+
+        # one file per generation: a second model on the same topic never replaces the first
+        name = pipeline.write_new(RUNS / run_slug, pipeline.run_name(mode, teacher, student),
+                                  ".html", out_html).stem
+        checks = pipeline.static_checks(out_html)
+        passed, total = sum(checks.values()), len(checks)
 
         split, extra = "", {}
         if mode == "teacher_student" and plan is not None:   # plan None: hard topic built whole by one model
             rec = pipeline.load_blueprint(topic, teacher) or {}  # the one run() just used
             fresh = any(u.role == "teacher" for u in usages)
-            student_cost = sum(u.cost_usd for u in usages if u.role == "student")
+            student_cost = sum(u.cost_usd for u in usages if u.role == "student") + refine_cost
             if not fresh:  # still name the teacher that wrote the stored blueprint
                 models.insert(0, {"role": "teacher", "model": rec.get("model", rec.get("teacher", "?")),
                                   "in_tokens": rec.get("in_tokens", 0), "out_tokens": rec.get("out_tokens", 0),
@@ -528,7 +566,7 @@ def run():
                  "grade": g, "teacher": teacher, "student": student,
                  "cost_usd": cost, "seconds": secs, "checks_passed": passed, "checks_total": total,
                  "models": models, "rag": use_rag, "file": name,
-                 "confidence_pct": confidence, "judge": scores, **extra})
+                 "confidence_pct": confidence, "judge": scores, "tier": tier, "refined": refined, **extra})
         badge = MODE_BADGE.get(mode, "")
         checks_cls = "checks-ok" if passed == total else "checks-bad"
         cards.append(f'''<div class="card">
@@ -538,7 +576,9 @@ def run():
             <div class="stats">
               <span class="stat">{money(cost)}</span><span class="stat">{secs:.1f}s</span>
               <span class="{checks_cls}">{passed}/{total} checks</span>
+              {tier_badge(tier)}
               {confidence_badge(confidence, (scores or {}).get("verdict"))}
+              {f'<span class="hint">revised once: {refined["before"]}% &rarr; {refined["after"]}%' + ('' if refined["kept"] else ' (kept the original)') + '</span>' if refined else ''}
             </div>
           </div>
           {split}
@@ -694,6 +734,8 @@ def view(run_slug, name):
           {detail_row("Confidence of correctness", confidence_badge(pipeline.confidence_pct(judge_scores)))}
           {"".join(detail_row(a.replace("_", " ").capitalize(), f"{judge_scores.get(a, '-')}/5") for a in axes)}
           {detail_row("Verdict", html.escape(str(judge_scores.get("verdict", "-"))))}
+          {detail_row("Fixes the judge asked for", "<br>".join(f"<b>{html.escape(str(i.get('axis', '')).replace('_', ' '))}</b>: {html.escape(str(i.get('fix', '')))}" for i in judge_scores.get("issues") or []) or "none")}
+          {detail_row("Revision pass", (f"{e['refined']['before']}% &rarr; {e['refined']['after']}% " + ("(kept)" if e['refined'].get('kept') else "(original kept)")) if e.get("refined") else "not run")}
         </table></div></div>"""
     elif mode != "blueprint":
         judge_html = '<div class="panel"><h2>Judge assessment</h2><p class="empty">Not judged for this run.</p></div>'
@@ -712,6 +754,7 @@ def view(run_slug, name):
     <div class="stats"><span class="stat">{money(e.get("cost_usd"))}</span>
       <span class="stat">{f"{e['seconds']:.1f}s" if e.get("seconds") is not None else "-"}</span>
       <span class="{"checks-ok" if not failed else "checks-bad"}">{passed}/{len(checks)} checks</span>
+      {tier_badge(e.get("tier") or tier_of(models))}
       {confidence_badge(pipeline.confidence_pct(judge_scores), (judge_scores or {}).get("verdict"))}</div>
   </div>
   {split}

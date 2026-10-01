@@ -137,6 +137,15 @@ before any model is paid (class, physics keywords in the topic); the blueprint c
 Students per tier: `STUDENT_EASY` / `STUDENT_MEDIUM` / `STUDENT_HARD` (defaults Muse Spark 1.3c / Gemini 3.8 Flash /
 Opus 5.5). With `HARD_SINGLE=1` a topic estimated hard skips the blueprint and `STUDENT_HARD` builds it in one call.
 
+## Judge confidence
+
+The judge (`JUDGE_ENABLED=true`) scores five axes /5 and returns a confidence %. 100% is not a realistic target
+for an LLM examiner, but the avoidable deductions are removed: the judge is told what the fixed shell already
+provides (so it only grades what the script adds), blueprints now ask for 1-2 sliders (a sim with none was
+the usual "limited user control" 3/5), and the judge lists concrete `issues`. A confidence below `REFINE_BELOW`
+(90) gets one revision pass by the builder (or `REFINE_MODEL`) using those issues, is re-judged, and the better
+version is kept (`JUDGE_REFINE=false` turns this off). The run card shows "revised once: 84% -> 92%".
+
 ## Checks
 
 `static_checks()` gates every output with no model call: is it HTML, has a canvas/SVG,

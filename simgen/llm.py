@@ -23,6 +23,7 @@ class Usage:
     cached_tokens: int = 0
     cost_source: str = "table"   # "reported" when the provider billed us a number
     finish: str = ""             # provider finish_reason; "length" = reply was cut off
+    tier: str = ""               # easy | medium | hard: difficulty of building this sim (set by pipeline.run)
 
     dict = asdict
 

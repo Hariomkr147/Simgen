@@ -317,6 +317,43 @@ def test_auto_student_routes_by_tier_and_escalates():
             os.environ.pop(k, None)
 
 
+def test_web_run_shows_tier_and_revises_low_judge_score():
+    """/run with the default 'auto' student: difficulty badge shown; a low judge score triggers one revision pass."""
+    import importlib
+    import app as webapp
+    importlib.reload(webapp)
+    for a in ("lo", "mid", "hi", "tch", "jdg"):
+        os.environ.update({f"MODEL_{a}_ID": a, f"MODEL_{a}_IN": "1", f"MODEL_{a}_OUT": "1"})
+    os.environ.update({"LLM_BASE_URL": "x", "LLM_API_KEY": "x", "STUDENT_EASY": "lo", "STUDENT_MEDIUM": "mid",
+                       "STUDENT_HARD": "hi", "JUDGE_ENABLED": "true", "JUDGE": "jdg", "TEACHER": "tch", "STUDENT": "auto"})
+    good, seen, verdicts = pipeline.EXAMPLE_TOPIC, [], [(4, "add a slider"), (5, None)]
+    pipeline.BLUEPRINTS = Path(tempfile.mkdtemp()); webapp.RUNS = Path(tempfile.mkdtemp()); webapp.LOG = webapp.RUNS / "library.jsonl"
+
+    def fake(alias, system, user, max_tokens=0):
+        seen.append((alias, user[:40]))
+        if "JSON shape" in user:
+            return json.dumps(dict(PLAN, build_tier="medium")), 10, 10
+        if "SIMULATION SOURCE" in user:
+            v, fix = verdicts.pop(0)
+            sc = {k: v for k in ("scientific_accuracy", "ncert_alignment", "interactivity", "grade_appropriateness", "pedagogy")}
+            return json.dumps(dict(sc, verdict="v", issues=[{"axis": "interactivity", "fix": fix}] if fix else [])), 10, 10
+        return "```js\n" + good + "\n```", 10, 10
+
+    llm.TRANSPORT = fake
+    try:
+        r = webapp.app.test_client().post("/run", data={"topic": "Pendulum", "grade": "9", "teacher": "tch", "student": "auto",
+                                                       "modes": "teacher_student"})
+        page = r.get_data(as_text=True)
+        assert "medium difficulty" in page and "revised once: 80% &rarr; 100%" in page, page[page.find("card-head"):][:900]
+        assert [a for a, _ in seen if a == "mid"] and "tch" in [a for a, _ in seen]     # medium student built + refined
+        row = json.loads(webapp.LOG.read_text().splitlines()[-1])
+        assert row["tier"] == "medium" and row["refined"] == {"before": 80, "after": 100, "kept": True} and row["confidence_pct"] == 100
+    finally:
+        llm.TRANSPORT = None
+        for k in ("JUDGE_ENABLED", "JUDGE", "STUDENT_EASY", "STUDENT_MEDIUM", "STUDENT_HARD", "STUDENT"):
+            os.environ.pop(k, None)
+
+
 def test_rag_off_without_dsn():
     os.environ.pop("NCERT_DSN", None)
     assert retrieve.ncert_context("Simple Pendulum", 9) == ""

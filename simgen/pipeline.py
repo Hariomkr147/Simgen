@@ -32,7 +32,7 @@ EXAMPLE_TOPIC = "\n".join(l for l in TOPIC_RE.search(SHELL).group(0)[len(TOPIC_S
 # The hand-built Ester Lab this format was modelled on, ported to the TOPIC API: the
 # reference for mechanism/process topics, as the pendulum is for experiments.
 EXAMPLE_ESTER = (Path(__file__).parent / "example_ester.js").read_text(encoding="utf-8")
-SCHEMA_VERSION = 2   # blueprints made for the old free-form page are never reused
+SCHEMA_VERSION = 3   # blueprints from an older prompt (no build_tier, grounding check, sliders rule) are never reused
 
 LAB_RULES = """What makes a good Lab app (it is judged on this):
 - The steps are the real sequence of the process or experiment (mechanism steps, stages of a cycle,
@@ -43,7 +43,10 @@ LAB_RULES = """What makes a good Lab app (it is judged on this):
 - Presets are genuinely different variants of the same phenomenon (reactant pairs, planets,
   materials, organisms, circuits), each carrying the numbers the science needs; the same steps
   work for every preset and the stage/HUD change with the preset.
-- Sliders only for real continuous quantities that change the outcome; otherwise none.
+- Give the learner something to vary, not only steps to click: 1-2 sliders for the continuous quantities that
+  change the outcome (temperature, concentration or mole ratio, current, angle, speed, length...), with the
+  stage and the HUD responding live as the slider moves. Only a topic with no continuous quantity at all gets
+  none, and then the toggle (reveal labels, vectors, ions...) is required.
 - The 4 HUD values change as the steps happen (step count, a computed or measured value with its
   unit, a state label...).
 - Step questions ask WHY that step happens; Think questions apply the idea to a new situation.
@@ -78,7 +81,7 @@ PLAN_SCHEMA = """{
   "misconceptions": [str],
   "grade_language_notes": str
 }
-Counts: presets.options 2-4, controls 0-2, hud exactly 4, steps 3-6, think exactly 3, words exactly 4."""
+Counts: presets.options 2-4, controls 1-2 (0 only if the topic has no continuous quantity; then "toggle" is required), hud exactly 4, steps 3-6, think exactly 3, words exactly 4."""
 
 TOPIC_CONTRACT = """You write ONLY the TOPIC script of a fixed "Lab app" shell. The shell already has the HTML, CSS,
 Play/Think tabs, Guide/Challenge coach, question sheets, key-words sheet, HUD, preset chips, sliders,
@@ -535,6 +538,12 @@ def final_tier(pre, plan):
     return max(pre, t if t in TIERS else pre, by_eq, key=TIERS.index)
 
 
+def _tag(usages, tier):
+    for u in usages:
+        u.tier = tier
+    return usages
+
+
 def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True):
     """mode in {teacher_only, student_only, teacher_student}. student == "auto" picks the student by
     difficulty (estimate_tier + the blueprint's build_tier -> STUDENT_EASY/MEDIUM/HARD); in
@@ -546,24 +555,21 @@ def run(mode, topic, grade, teacher, student, use_rag=True, reuse_blueprint=True
         if auto and pre == "hard" and os.getenv("HARD_SINGLE", "").lower() in ("1", "true", "yes"):
             html_out, bu = _build(tier_student("hard"), "student",
                                   _build_prompt(topic, grade, grounding(topic, grade, use_rag)))
-            return html_out, None, bu
+            return html_out, None, _tag(bu, "hard")
         rec, usages = blueprint(topic, grade, teacher, use_rag, force=not reuse_blueprint)
         # The blueprint already carries the grounded facts, so the student doesn't
         # re-pay for the NCERT context. That is where most of the saving comes from.
         prompt = _build_prompt(topic, grade, "", rec["plan"])
-        if auto:
-            html_out, bu = _build_tiered(final_tier(pre, rec["plan"]), prompt)
-        else:
-            html_out, bu = _build(student, "student", prompt)
-        return html_out, rec["plan"], usages + bu
+        tier = final_tier(pre, rec["plan"])
+        html_out, bu = _build_tiered(tier, prompt) if auto else _build(student, "student", prompt)
+        return html_out, rec["plan"], _tag(usages + bu, tier)
 
     context = grounding(topic, grade, use_rag)
     if mode in ("teacher_only", "student_only"):
         alias, role = (teacher, "teacher") if mode == "teacher_only" else (student, "student")
-        if alias == AUTO:
-            alias = tier_student(estimate_tier(topic, grade, context)[0])
-        html_out, bu = _build(alias, role, _build_prompt(topic, grade, context))
-        return html_out, None, bu
+        tier = estimate_tier(topic, grade, context)[0]
+        html_out, bu = _build(tier_student(tier) if alias == AUTO else alias, role, _build_prompt(topic, grade, context))
+        return html_out, None, _tag(bu, tier)
 
     raise ValueError(f"unknown mode {mode}")
 
@@ -576,15 +582,22 @@ MODES = ("teacher_only", "student_only", "teacher_student")
 JUDGE_SYS = ("You are an NCERT science examiner grading a teaching simulation's source code. "
              "Be strict. Output JSON only.")
 
-JUDGE_RUBRIC = """Score 0-5 on each, then give a one-line verdict:
+JUDGE_RUBRIC = """Score 0-5 on each, then give a one-line verdict and the concrete fixes:
 {"scientific_accuracy": int, "ncert_alignment": int, "interactivity": int,
- "grade_appropriateness": int, "pedagogy": int, "verdict": str}
+ "grade_appropriateness": int, "pedagogy": int, "verdict": str,
+ "issues": [{"axis": "one of the five names above", "fix": "one concrete change to the TOPIC script"}]}
 scientific_accuracy: are the equations and the numeric update rule right?
 ncert_alignment: does it cover the chapter's actual learning outcomes?
-interactivity: do the steps, presets and sliders change the simulation in a scientifically meaningful way?
+interactivity: do the presets, sliders/toggle and steps change the stage and the HUD in a scientifically
+  meaningful way? (Sliders are expected wherever the science has a continuous quantity.)
 grade_appropriateness: vocabulary and maths level.
 pedagogy: do the ordered steps, the question after each step and the Think questions teach the concept?
-(For a Lab app you are shown only its TOPIC script; the shared UI shell around it is fixed and not graded.)"""
+You are shown only the TOPIC script. It runs inside a fixed shell that already provides preset chips, ordered
+step buttons, a Guide/Challenge coach with a question after each step, a Think tab of 3 questions, a key-words
+sheet, a 4-value HUD, sliders, a toggle, and phone and dark layouts. Do not deduct for what the shell does,
+and judge only what the script adds on top of it. 5 means nothing a teacher would change. Every score below 5
+needs an entry in "issues": a concrete, implementable change to the script (at most 5, most valuable first);
+a score of 5 needs none."""
 
 
 def judge(html, topic, grade, judge_alias):
@@ -601,10 +614,24 @@ def judge(html, topic, grade, judge_alias):
                    f"Topic: {topic}\nGrade: {grade}\n\n{JUDGE_RUBRIC}\n\nSIMULATION SOURCE:\n{src[:60000]}",
                    role="judge", max_tokens=8000)
     scores = extract_json(text)
+    scores["issues"] = [i for i in scores.get("issues") or [] if isinstance(i, dict) and i.get("fix")][:5]
     keys = ("scientific_accuracy", "ncert_alignment", "interactivity",
             "grade_appropriateness", "pedagogy")
     scores["total"] = sum(int(scores.get(k, 0)) for k in keys)
     return scores, u
+
+
+def refine(html, topic, grade, alias, issues):
+    """One revision pass: the builder gets its own script back with the examiner's concrete fixes.
+    Returns (html, [Usage]) like _build (role 'refine'); raises BuildError if the result doesn't parse."""
+    listed = "\n".join(f"- ({i.get('axis', '?')}) {i['fix']}" for i in issues)
+    prompt = (f"Topic: {topic}\nGrade: {grade or 'infer from topic'}\n\n"
+              "Below is a finished TOPIC script for the Lab-app shell. An examiner found these problems:\n"
+              f"{listed}\n\nReturn the COMPLETE improved script with exactly these fixed. Keep everything that already "
+              "works, keep the same API and contract, do not shorten it, do not add anything unrelated.\n\n"
+              f"{TOPIC_CONTRACT}\n\nCURRENT SCRIPT:\n```js\n{topic_of(html)}\n```\n\n"
+              "Return ONLY the script in a single ```js code fence.")
+    return _build(alias, "refine", prompt)
 
 
 def confidence_pct(scores):
