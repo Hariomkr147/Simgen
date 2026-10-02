@@ -63,7 +63,7 @@ def main(argv=None):
     ap.add_argument("--judge-model", default=os.getenv("JUDGE", "opus5"))
     ap.add_argument("--no-rag", action="store_true", help="skip NCERT retrieval")
     ap.add_argument("--narrate", default="", help="spoken audio: en, hi (Hinglish) or en,hi")
-    ap.add_argument("--tts", default="gemini", choices=["gemini", "sarvam"], help="voice for --narrate")
+    ap.add_argument("--tts", default="gemini", choices=["gemini", "sarvam", "kokoro"], help="voice for --narrate")
     ap.add_argument("--fresh-blueprint", action="store_true",
                     help="regenerate the teacher blueprint even if one is stored in blueprints/")
     ap.add_argument("--out", default="runs")

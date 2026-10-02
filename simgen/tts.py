@@ -4,7 +4,7 @@ A simulation's TOPIC script is read (QuickJS, nothing is run) for its texts; eac
 beside the simulation (<name>.audio/<lang>/<id>.mp3). The Lab shell plays them when the matching coach line,
 question or explanation appears. Two languages: "en" (the text as written) and "hi" (Hinglish: a model rewrites
 each line the way a teacher would say it, Hindi words in Devanagari and English science terms in Latin script).
-Two voices: Gemini 3.8 Flash TTS through OpenRouter (default, same key as every other model) and Sarvam Bulbul v3.
+Three voices: Gemini 3.8 Flash TTS and Kokoro 82M through OpenRouter (same key as every other model), and Sarvam Bulbul v3.
 """
 import base64
 import concurrent.futures as cf
@@ -21,7 +21,7 @@ from pathlib import Path
 from . import llm
 from .pipeline import assemble, extract_json, topic_of
 
-PROVIDERS = {"gemini": "Gemini 3.8 Flash TTS", "sarvam": "Sarvam Bulbul v3"}
+PROVIDERS = {"gemini": "Gemini 3.8 Flash TTS", "sarvam": "Sarvam Bulbul v3", "kokoro": "Kokoro 82M"}
 DEFAULT_PROVIDER = "gemini"
 LANGS = {"en": "English", "hi": "Hinglish"}
 CLIP_FILE = re.compile(r"[a-z0-9_.-]+\.mp3")
@@ -154,8 +154,21 @@ def _sarvam(text, lang):
         raise RuntimeError(f"Sarvam returned no audio: {data[:300].decode('utf-8', 'replace')}") from None
 
 
+def _kokoro(text, lang):
+    """Kokoro 82M (open weights, served by DeepInfra) via OpenRouter /audio/speech. The voice's first letter
+    picks the language (a = American English, h = Hindi), so Hinglish uses a Hindi voice. Kokoro's Hindi
+    front end reads Devanagari; Latin-script English terms inside it may be skipped or mispronounced."""
+    base = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+    data, ctype = _post(f"{base}/audio/speech", {"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"},
+                        {"model": os.getenv("TTS_KOKORO_MODEL", "hexgrad/kokoro-82m"), "input": text,
+                         "voice": voice_id("kokoro", lang), "response_format": "mp3"})
+    if "json" in ctype.lower() or data[:1] == b"{":
+        raise RuntimeError(f"Kokoro TTS returned an error: {data[:300].decode('utf-8', 'replace')}")
+    return data
+
+
 # request size limits per provider (characters; Devanagari is 3 bytes a character, so Gemini's is lower)
-VOICES = {"gemini": (_gemini, 1200), "sarvam": (_sarvam, 2400)}
+VOICES = {"gemini": (_gemini, 1200), "sarvam": (_sarvam, 2400), "kokoro": (_kokoro, 1000)}
 
 
 def speak(provider, text, lang):
@@ -164,8 +177,9 @@ def speak(provider, text, lang):
     return b"".join(fn(piece, lang) for piece in _chunks(text, limit))
 
 
-def voice_id(provider):
-    return {"gemini": os.getenv("TTS_GEMINI_VOICE", "Kore"), "sarvam": os.getenv("SARVAM_SPEAKER", "shubh")}[provider]
+def voice_id(provider, lang="en"):
+    return {"gemini": os.getenv("TTS_GEMINI_VOICE", "Kore"), "sarvam": os.getenv("SARVAM_SPEAKER", "shubh"),
+            "kokoro": os.getenv("TTS_KOKORO_VOICE_HI", "hf_alpha") if lang == "hi" else os.getenv("TTS_KOKORO_VOICE_EN", "af_heart")}[provider]
 
 
 def tts_cost_usd(provider, chars):
@@ -174,6 +188,8 @@ def tts_cost_usd(provider, chars):
     (TTS_GEMINI_USD_PER_MCHAR to adjust, e.g. when Google's price changes on 1 Jan 2027)."""
     if provider == "sarvam":
         return chars * 0.003 / USD_INR
+    if provider == "kokoro":
+        return chars * 0.62 / 1e6          # DeepInfra via OpenRouter, $0.62 per million characters
     return chars * float(os.getenv("TTS_GEMINI_USD_PER_MCHAR", "16")) / 1e6
 
 
@@ -224,7 +240,7 @@ def narrate(html, audio_dir, provider=DEFAULT_PROVIDER, langs=("en",), grade=Non
         with cf.ThreadPoolExecutor(workers or int(os.getenv("TTS_WORKERS", "4"))) as ex:
             list(ex.map(one, todo.items()))      # re-raises the first failure
         chars = sum(len(t) for t in todo.values())
-        man["langs"][lang] = {"label": LANGS[lang], "provider": provider, "voice": voice_id(provider),
+        man["langs"][lang] = {"label": LANGS[lang], "provider": provider, "voice": voice_id(provider, lang),
                               "clips": {k: {"text": t, "sha": _sha(provider, t), "src": english[k]} for k, t in texts.items()}}
         if todo:
             usages.append(llm.Usage("tts", f"{provider}:{PROVIDERS[provider]}", chars, 0,

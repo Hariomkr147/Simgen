@@ -52,6 +52,11 @@ def test_providers_request_shape():
         url, headers, body = calls[-1]
         assert url == "https://or.test/api/v1/audio/speech" and headers["Authorization"] == "Bearer k"
         assert body == {"model": "google/gemini-3.8-flash-tts", "input": "Hello", "voice": "Kore", "response_format": "mp3"}
+        assert tts.speak("kokoro", "नमस्ते", "hi") == b"GEMINI"      # fake returns plain bytes for any OpenRouter voice
+        url, headers, body = calls[-1]
+        assert url == "https://or.test/api/v1/audio/speech" and body == {"model": "hexgrad/kokoro-82m", "input": "नमस्ते", "voice": "hf_alpha", "response_format": "mp3"}
+        assert tts.speak("kokoro", "Hello", "en") == b"GEMINI" and calls[-1][2]["voice"] == "af_heart"
+        assert tts.tts_cost_usd("kokoro", 1_000_000) == 0.62
         assert tts.speak("sarvam", "नमस्ते science", "hi") == b"SARVAM"
         url, headers, body = calls[-1]
         assert url == "https://api.sarvam.ai/text-to-speech" and headers["api-subscription-key"] == "sk"
