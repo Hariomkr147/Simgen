@@ -135,10 +135,21 @@ def _gemini(text, lang):
     base = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
     data, ctype = _post(f"{base}/audio/speech", {"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"},
                         {"model": model, "input": text, "voice": os.getenv("TTS_GEMINI_VOICE", "Kore"),
-                         "response_format": "mp3"})
+                         "response_format": "pcm"})        # Gemini TTS refuses mp3: raw 24 kHz 16-bit mono PCM only
     if "json" in ctype.lower() or data[:1] == b"{":
         raise RuntimeError(f"Gemini TTS returned an error: {data[:300].decode('utf-8', 'replace')}")
-    return data
+    return _pcm_to_mp3(data)
+
+
+def _pcm_to_mp3(pcm, rate=24000):
+    """Raw s16le mono PCM -> MP3 (pure-pip lameenc, no ffmpeg needed on the server). MP3 pieces concatenate."""
+    import lameenc
+    enc = lameenc.Encoder()
+    enc.set_bit_rate(64)
+    enc.set_in_sample_rate(rate)
+    enc.set_channels(1)
+    enc.set_quality(2)
+    return bytes(enc.encode(pcm[: len(pcm) // 2 * 2])) + bytes(enc.flush())
 
 
 def _sarvam(text, lang):

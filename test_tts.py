@@ -17,6 +17,8 @@ def fake_http(calls):
         calls.append((url, headers, body))
         if "sarvam" in url:
             return json.dumps({"audios": [base64.b64encode(b"SARVAM").decode()]}).encode(), "application/json"
+        if body.get("response_format") == "pcm":
+            return b"\0\0" * 2400, "audio/pcm"            # 0.1 s of silence, like Gemini's raw PCM
         return b"GEMINI", "audio/mpeg"
     return post
 
@@ -48,10 +50,11 @@ def test_providers_request_shape():
     calls, real = [], tts._post
     tts._post = fake_http(calls)
     try:
-        assert tts.speak("gemini", "Hello", "en") == b"GEMINI"
+        mp3 = tts.speak("gemini", "Hello", "en")
+        assert mp3[:3] == b"ID3" or mp3[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"), mp3[:4]   # real MP3, not PCM
         url, headers, body = calls[-1]
         assert url == "https://or.test/api/v1/audio/speech" and headers["Authorization"] == "Bearer k"
-        assert body == {"model": "google/gemini-3.8-flash-tts", "input": "Hello", "voice": "Kore", "response_format": "mp3"}
+        assert body == {"model": "google/gemini-3.8-flash-tts", "input": "Hello", "voice": "Kore", "response_format": "pcm"}
         assert tts.speak("kokoro", "नमस्ते", "hi") == b"GEMINI"      # fake returns plain bytes for any OpenRouter voice
         url, headers, body = calls[-1]
         assert url == "https://or.test/api/v1/audio/speech" and body == {"model": "hexgrad/kokoro-82m", "input": "नमस्ते", "voice": "hf_alpha", "response_format": "mp3"}
@@ -78,7 +81,7 @@ def test_narrate_english_hinglish_and_cache():
         man, us = tts.narrate(HTML, d, "gemini", ("en", "hi"))
         ids = list(tts.clip_texts(pipeline.topic_of(HTML)))
         assert set(man["langs"]) == {"en", "hi"} and set(man["langs"]["en"]["clips"]) == set(ids)
-        assert all((d / lang / f"{k}.mp3").read_bytes() == b"GEMINI" for lang in ("en", "hi") for k in ids)
+        assert all((d / lang / f"{k}.mp3").read_bytes()[:3] != b"{\"" for lang in ("en", "hi") for k in ids)
         assert man["langs"]["hi"]["clips"]["s0.do"]["text"].startswith("हिंदी")
         assert [u.role for u in us] == ["tts", "narration", "tts"] or {u.role for u in us} == {"tts", "narration"}
         assert all(u.cost_usd > 0 for u in us if u.role == "tts")

@@ -4,3 +4,4 @@ flask>=3.0
 quickjs>=1.19   # parses each generated TOPIC script before it is saved
 
 gunicorn>=21.2
+lameenc>=1.7   # Gemini TTS only returns raw PCM; this makes the MP3s
