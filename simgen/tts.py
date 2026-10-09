@@ -9,6 +9,7 @@ Three voices: Gemini 3.8 Flash TTS and Kokoro 82M through OpenRouter (same key a
 import base64
 import concurrent.futures as cf
 import hashlib
+import io
 import html as htmllib
 import json
 import os
@@ -16,12 +17,13 @@ import re
 import time
 import urllib.error
 import urllib.request
+import wave
 from pathlib import Path
 
 from . import llm
 from .pipeline import assemble, extract_json, topic_of
 
-PROVIDERS = {"gemini": "Gemini 3.8 Flash TTS", "sarvam": "Sarvam Bulbul v3", "kokoro": "Kokoro 82M"}
+PROVIDERS = {"gemini": "Gemini 3.8 Flash TTS", "sarvam": "Sarvam Bulbul v3", "kokoro": "Kokoro 82M", "indic": "Hindi-English TTS (shared server)"}
 DEFAULT_PROVIDER = "gemini"
 LANGS = {"en": "English", "hi": "Hinglish"}
 CLIP_FILE = re.compile(r"[a-z0-9_.-]+\.mp3")
@@ -178,8 +180,20 @@ def _kokoro(text, lang):
     return data
 
 
+def _indic(text, lang):
+    """The shared Hindi/English/mixed TTS server (kavya, agastya, maitri, vinaya): POST {base}/tts with an
+    X-API-Key header returns a 24 kHz mono WAV, which becomes MP3 here. Hinglish text goes as it is."""
+    base = os.environ["TTS_INDIC_URL"].rstrip("/")
+    data, ctype = _post(f"{base}/tts", {"X-API-Key": os.environ["TTS_INDIC_KEY"], "User-Agent": "simgen/1.0"},
+                        {"text": text, "speaker": voice_id("indic", lang)}, timeout=110)
+    if data[:4] != b"RIFF":
+        raise RuntimeError(f"Indic TTS returned no audio: {data[:300].decode('utf-8', 'replace')}")
+    with wave.open(io.BytesIO(data)) as w:
+        return _pcm_to_mp3(w.readframes(w.getnframes()), w.getframerate())
+
+
 # request size limits per provider (characters; Devanagari is 3 bytes a character, so Gemini's is lower)
-VOICES = {"gemini": (_gemini, 1200), "sarvam": (_sarvam, 2400), "kokoro": (_kokoro, 1000)}
+VOICES = {"gemini": (_gemini, 1200), "sarvam": (_sarvam, 2400), "kokoro": (_kokoro, 1000), "indic": (_indic, 600)}
 
 
 def speak(provider, text, lang):
@@ -190,6 +204,7 @@ def speak(provider, text, lang):
 
 def voice_id(provider, lang="en"):
     return {"gemini": os.getenv("TTS_GEMINI_VOICE", "Kore"), "sarvam": os.getenv("SARVAM_SPEAKER", "shubh"),
+            "indic": os.getenv("TTS_INDIC_SPEAKER", "kavya"),
             "kokoro": os.getenv("TTS_KOKORO_VOICE_HI", "hf_alpha") if lang == "hi" else os.getenv("TTS_KOKORO_VOICE_EN", "af_heart")}[provider]
 
 
@@ -199,6 +214,8 @@ def tts_cost_usd(provider, chars):
     (TTS_GEMINI_USD_PER_MCHAR to adjust, e.g. when Google's price changes on 1 Jan 2027)."""
     if provider == "sarvam":
         return chars * 0.003 / USD_INR
+    if provider == "indic":
+        return 0.0                         # a shared research server, no per-character bill
     if provider == "kokoro":
         return chars * 0.62 / 1e6          # DeepInfra via OpenRouter, $0.62 per million characters
     return chars * float(os.getenv("TTS_GEMINI_USD_PER_MCHAR", "16")) / 1e6

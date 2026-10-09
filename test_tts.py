@@ -60,6 +60,14 @@ def test_providers_request_shape():
         assert url == "https://or.test/api/v1/audio/speech" and body == {"model": "hexgrad/kokoro-82m", "input": "नमस्ते", "voice": "hf_alpha", "response_format": "mp3"}
         assert tts.speak("kokoro", "Hello", "en") == b"GEMINI" and calls[-1][2]["voice"] == "af_heart"
         assert tts.tts_cost_usd("kokoro", 1_000_000) == 0.62
+        import io, wave
+        buf = io.BytesIO(); w = wave.open(buf, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(b"\0\0" * 2400); w.close()
+        wav = buf.getvalue(); os.environ.update(TTS_INDIC_URL="https://tts.test/", TTS_INDIC_KEY="ik")
+        tts._post = lambda url, headers, body, timeout=120: (calls.append((url, headers, body)) or (wav, "audio/wav"))
+        assert tts.speak("indic", "इस lecture में", "hi")[:3] == b"ID3" or tts.speak("indic", "x", "hi")[:1] == b"\xff"
+        url, headers, body = calls[-1]
+        assert url == "https://tts.test/tts" and headers["X-API-Key"] == "ik" and body == {"text": "x", "speaker": "kavya"}
+        tts._post = fake_http(calls)
         assert tts.speak("sarvam", "नमस्ते science", "hi") == b"SARVAM"
         url, headers, body = calls[-1]
         assert url == "https://api.sarvam.ai/text-to-speech" and headers["api-subscription-key"] == "sk"
