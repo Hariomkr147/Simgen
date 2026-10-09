@@ -130,13 +130,13 @@ def _chunks(text, limit):
     return parts + [cur] if cur else parts
 
 
-def _gemini(text, lang):
+def _gemini(text, lang, voice=None):
     """Gemini 3.8 Flash TTS via OpenRouter's OpenAI-compatible /audio/speech: raw MP3 bytes back.
     Gemini picks the language from the text itself."""
     model = os.getenv("TTS_GEMINI_MODEL", "google/gemini-3.8-flash-tts")
     base = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
     data, ctype = _post(f"{base}/audio/speech", {"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"},
-                        {"model": model, "input": text, "voice": os.getenv("TTS_GEMINI_VOICE", "Kore"),
+                        {"model": model, "input": text, "voice": voice_id("gemini", lang, voice),
                          "response_format": "pcm"})        # Gemini TTS refuses mp3: raw 24 kHz 16-bit mono PCM only
     if "json" in ctype.lower() or data[:1] == b"{":
         raise RuntimeError(f"Gemini TTS returned an error: {data[:300].decode('utf-8', 'replace')}")
@@ -154,12 +154,12 @@ def _pcm_to_mp3(pcm, rate=24000):
     return bytes(enc.encode(pcm[: len(pcm) // 2 * 2])) + bytes(enc.flush())
 
 
-def _sarvam(text, lang):
+def _sarvam(text, lang, voice=None):
     """Sarvam Bulbul v3: JSON with base64 audio. Hinglish goes as hi-IN with the English words left in Latin
     script (the model handles the switch itself)."""
     data, _ = _post("https://api.sarvam.ai/text-to-speech", {"api-subscription-key": os.environ["SARVAM_API_KEY"]},
                     {"text": text, "language_code": "hi-IN" if lang == "hi" else "en-IN", "model": "bulbul:v3",
-                     "speaker": os.getenv("SARVAM_SPEAKER", "shubh"), "output_audio_codec": "mp3",
+                     "speaker": voice_id("sarvam", lang, voice), "output_audio_codec": "mp3",
                      "speech_sample_rate": 24000, "pace": float(os.getenv("SARVAM_PACE", "1.0"))})
     try:
         return base64.b64decode(json.loads(data)["audios"][0])
@@ -167,43 +167,47 @@ def _sarvam(text, lang):
         raise RuntimeError(f"Sarvam returned no audio: {data[:300].decode('utf-8', 'replace')}") from None
 
 
-def _kokoro(text, lang):
+def _kokoro(text, lang, voice=None):
     """Kokoro 82M (open weights, served by DeepInfra) via OpenRouter /audio/speech. The voice's first letter
     picks the language (a = American English, h = Hindi), so Hinglish uses a Hindi voice. Kokoro's Hindi
     front end reads Devanagari; Latin-script English terms inside it may be skipped or mispronounced."""
     base = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
     data, ctype = _post(f"{base}/audio/speech", {"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"},
                         {"model": os.getenv("TTS_KOKORO_MODEL", "hexgrad/kokoro-82m"), "input": text,
-                         "voice": voice_id("kokoro", lang), "response_format": "mp3"})
+                         "voice": voice_id("kokoro", lang, voice), "response_format": "mp3"})
     if "json" in ctype.lower() or data[:1] == b"{":
         raise RuntimeError(f"Kokoro TTS returned an error: {data[:300].decode('utf-8', 'replace')}")
     return data
 
 
-def _indic(text, lang):
+def _indic(text, lang, voice=None):
     """The shared Hindi/English/mixed TTS server (kavya, agastya, maitri, vinaya): POST {base}/tts with an
     X-API-Key header returns a 24 kHz mono WAV, which becomes MP3 here. Hinglish text goes as it is."""
     base = os.environ["TTS_INDIC_URL"].rstrip("/")
     data, ctype = _post(f"{base}/tts", {"X-API-Key": os.environ["TTS_INDIC_KEY"], "User-Agent": "simgen/1.0"},
-                        {"text": text, "speaker": voice_id("indic", lang)}, timeout=110)
+                        {"text": text, "speaker": voice_id("indic", lang, voice)}, timeout=110)
     if data[:4] != b"RIFF":
         raise RuntimeError(f"Indic TTS returned no audio: {data[:300].decode('utf-8', 'replace')}")
     with wave.open(io.BytesIO(data)) as w:
         return _pcm_to_mp3(w.readframes(w.getnframes()), w.getframerate())
 
 
+# speakers the UI offers per provider (a provider not listed here has just its configured default)
+VOICE_CHOICES = {"indic": ["kavya", "agastya", "maitri", "vinaya"], "gemini": ["Kore", "Puck", "Zephyr", "Charon", "Leda"]}
+
+
 # request size limits per provider (characters; Devanagari is 3 bytes a character, so Gemini's is lower)
 VOICES = {"gemini": (_gemini, 1200), "sarvam": (_sarvam, 2400), "kokoro": (_kokoro, 1000), "indic": (_indic, 600)}
 
 
-def speak(provider, text, lang):
+def speak(provider, text, lang, voice=None):
     """MP3 bytes for text. Long text is split by sentence; MP3 pieces simply concatenate."""
     fn, limit = VOICES[provider]
-    return b"".join(fn(piece, lang) for piece in _chunks(text, limit))
+    return b"".join(fn(piece, lang, voice) for piece in _chunks(text, limit))
 
 
-def voice_id(provider, lang="en"):
-    return {"gemini": os.getenv("TTS_GEMINI_VOICE", "Kore"), "sarvam": os.getenv("SARVAM_SPEAKER", "shubh"),
+def voice_id(provider, lang="en", voice=None):
+    return voice or {"gemini": os.getenv("TTS_GEMINI_VOICE", "Kore"), "sarvam": os.getenv("SARVAM_SPEAKER", "shubh"),
             "indic": os.getenv("TTS_INDIC_SPEAKER", "kavya"),
             "kokoro": os.getenv("TTS_KOKORO_VOICE_HI", "hf_alpha") if lang == "hi" else os.getenv("TTS_KOKORO_VOICE_EN", "af_heart")}[provider]
 
@@ -223,8 +227,8 @@ def tts_cost_usd(provider, chars):
 
 # ---------------------------------------------------------------- narrate a simulation
 
-def _sha(provider, text):
-    return hashlib.sha1(f"{provider}|{voice_id(provider)}|{text}".encode("utf-8")).hexdigest()[:12]
+def _sha(provider, text, voice=None):
+    return hashlib.sha1(f"{provider}|{voice_id(provider, voice=voice)}|{text}".encode("utf-8")).hexdigest()[:12]
 
 
 def read_manifest(audio_dir):
@@ -237,6 +241,8 @@ def read_manifest(audio_dir):
 def narrate(html, audio_dir, provider=DEFAULT_PROVIDER, langs=("en",), grade=None, workers=None):
     """Make (or refresh) the audio for a simulation. Returns (manifest, [Usage]). A clip whose text and voice
     are unchanged is not paid for again. Raises if the page has no TOPIC script or a clip can't be made."""
+    provider, _, voice = provider.partition(":")      # "indic:maitri" = provider + speaker; plain name = its default speaker
+    voice = voice or None
     if provider not in VOICES:
         raise ValueError(f"unknown TTS provider {provider!r}; choose from {', '.join(VOICES)}")
     topic_js = topic_of(html)
@@ -257,19 +263,19 @@ def narrate(html, audio_dir, provider=DEFAULT_PROVIDER, langs=("en",), grade=Non
             usages += [u] if u else []
             texts = {k: kept.get(k) or new[k] for k in english}
         todo = {k: t for k, t in texts.items()
-                if not ((audio_dir / lang / f"{k}.mp3").exists() and old.get(k, {}).get("sha") == _sha(provider, t))}
+                if not ((audio_dir / lang / f"{k}.mp3").exists() and old.get(k, {}).get("sha") == _sha(provider, t, voice))}
         (audio_dir / lang).mkdir(parents=True, exist_ok=True)
         t0 = time.time()
 
         def one(item):
             k, t = item
-            (audio_dir / lang / f"{k}.mp3").write_bytes(speak(provider, t, lang))
+            (audio_dir / lang / f"{k}.mp3").write_bytes(speak(provider, t, lang, voice))
 
         with cf.ThreadPoolExecutor(workers or int(os.getenv("TTS_WORKERS", "4"))) as ex:
             list(ex.map(one, todo.items()))      # re-raises the first failure
         chars = sum(len(t) for t in todo.values())
-        man["langs"][lang] = {"label": LANGS[lang], "provider": provider, "voice": voice_id(provider, lang),
-                              "clips": {k: {"text": t, "sha": _sha(provider, t), "src": english[k]} for k, t in texts.items()}}
+        man["langs"][lang] = {"label": LANGS[lang], "provider": provider, "voice": voice_id(provider, lang, voice),
+                              "clips": {k: {"text": t, "sha": _sha(provider, t, voice), "src": english[k]} for k, t in texts.items()}}
         if todo:
             usages.append(llm.Usage("tts", f"{provider}:{PROVIDERS[provider]}", chars, 0,
                                     round(tts_cost_usd(provider, chars), 6), round(time.time() - t0, 2),

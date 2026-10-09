@@ -224,8 +224,13 @@ NARRATE_CHOICES = {"none": ((), "none"), "en": (("en",), "English"), "hi": (("hi
 
 
 def tts_options(selected):
-    return "".join(f'<option value="{k}"{" selected" if k == selected else ""}>{html.escape(v)}</option>'
-                   for k, v in speech.PROVIDERS.items())
+    """One option per provider, or per speaker where the provider offers a choice ("indic:maitri")."""
+    if ":" not in (selected or "") and selected in speech.VOICE_CHOICES:
+        selected = f"{selected}:{speech.voice_id(selected)}"          # a plain provider name means its default speaker
+    opts = []
+    for k, v in speech.PROVIDERS.items():
+        opts += [(f"{k}:{vc}", f"{v} - {vc}") for vc in speech.VOICE_CHOICES[k]] if k in speech.VOICE_CHOICES else [(k, v)]
+    return "".join(f'<option value="{k}"{" selected" if k == selected else ""}>{html.escape(v)}</option>' for k, v in opts)
 
 
 def narrate_options(selected):
@@ -579,7 +584,7 @@ def run():
                 narr_cost = sum(u.cost_usd for u in nus)
                 cost += narr_cost; secs += sum(u.seconds for u in nus)
                 narr_note = (f'<span class="hint">narrated ({" + ".join(speech.LANGS[l] for l in langs)}, '
-                             f'{html.escape(speech.PROVIDERS[provider])})</span>')
+                             f'{html.escape(speech.PROVIDERS[provider.partition(":")[0]])})</span>')
             except Exception as e:
                 narr_note = f'<span class="checks-bad" title="{html.escape(str(e))}">narration failed</span> <span class="hint">{html.escape(str(e)[:160])}</span>'
 

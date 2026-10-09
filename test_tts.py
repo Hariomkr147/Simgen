@@ -68,6 +68,9 @@ def test_providers_request_shape():
         url, headers, body = calls[-1]
         assert url == "https://tts.test/tts" and headers["X-API-Key"] == "ik" and body == {"text": "x", "speaker": "kavya"}
         tts._post = fake_http(calls)
+        tts._post = lambda url, headers, body, timeout=120: (calls.append((url, headers, body)) or (wav, "audio/wav"))
+        tts.speak("indic", "x", "hi", "maitri"); assert calls[-1][2]["speaker"] == "maitri"
+        tts._post = fake_http(calls)
         assert tts.speak("sarvam", "नमस्ते science", "hi") == b"SARVAM"
         url, headers, body = calls[-1]
         assert url == "https://api.sarvam.ai/text-to-speech" and headers["api-subscription-key"] == "sk"
